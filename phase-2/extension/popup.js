@@ -10,6 +10,7 @@ let apiKeys = { claude: '', gemini: '', openai: '', deepseek: '', groq: '', mist
 let workspacePresets = [];
 let loadedDesignTokens = null;
 let activeTabVariables = null;
+let historyLog = [];
 
 function init() {
   setupTabs();
@@ -24,6 +25,7 @@ function init() {
   setupAgentSelect();
   setupPresets();
   setupDesignTokens();
+  setupHistory();
 }
 
 function setupTabs() {
@@ -615,6 +617,7 @@ function renderOutput(parsed) {
   if (downBtn) downBtn.className = 'feedback-btn';
 
   document.getElementById('output-wrap').classList.add('visible');
+  logPromptToHistory(lastPrompt);
 }
 
 function setupOutput() {
@@ -1157,6 +1160,282 @@ function renderDesignTokensState() {
     row.classList.add('hidden');
     emptyMsg.classList.remove('hidden');
   }
+}
+
+// Category 2: Saved / Prompt History Drawer implementation
+function setupHistory() {
+  const toggleBtn = document.getElementById('history-toggle-btn');
+  const drawer = document.getElementById('history-drawer');
+  const closeBtn = document.getElementById('history-close-btn');
+  const clearAllBtn = document.getElementById('history-clear-all');
+
+  if (toggleBtn && drawer) {
+    toggleBtn.addEventListener('click', () => {
+      drawer.classList.toggle('open');
+      renderHistory();
+    });
+  }
+
+  if (closeBtn && drawer) {
+    closeBtn.addEventListener('click', () => {
+      drawer.classList.remove('open');
+    });
+  }
+
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear your prompt history?')) {
+        historyLog = [];
+        saveHistoryToStorage();
+        renderHistory();
+      }
+    });
+  }
+
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(['historyLog'], (result) => {
+      if (result.historyLog && Array.isArray(result.historyLog)) {
+        historyLog = result.historyLog;
+        renderHistory();
+      }
+    });
+  }
+}
+
+function logPromptToHistory(promptText) {
+  if (!promptText) return;
+  
+  if (historyLog.length > 0 && historyLog[0].prompt === promptText) {
+    return;
+  }
+
+  const fw = getSelected('fw-group') || 'React';
+  const st = getSelected('st-group') || 'Pixel-perfect';
+  const colors = document.getElementById('clr-inp').value.trim();
+  const font = document.getElementById('fnt-inp').value.trim();
+
+  const historyObj = {
+    id: Date.now().toString(),
+    prompt: promptText,
+    fw: fw,
+    st: st,
+    colors: colors,
+    font: font,
+    timestamp: Date.now(),
+    starred: false
+  };
+
+  historyLog.unshift(historyObj);
+
+  if (historyLog.length > 30) {
+    historyLog = historyLog.slice(0, 30);
+  }
+
+  saveHistoryToStorage();
+}
+
+function saveHistoryToStorage() {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.set({ historyLog }, () => {
+      console.log('History saved to local storage');
+    });
+  }
+}
+
+function renderHistory() {
+  const container = document.getElementById('history-list');
+  if (!container) return;
+
+  const clearBtn = document.getElementById('history-clear-all');
+  if (clearBtn) {
+    if (historyLog.length > 0) {
+      clearBtn.classList.remove('hidden');
+    } else {
+      clearBtn.classList.add('hidden');
+    }
+  }
+
+  container.innerHTML = '';
+
+  if (historyLog.length === 0) {
+    container.innerHTML = '<div class="empty-history" id="history-empty-msg">No prompt history found. Try generating above!</div>';
+    return;
+  }
+
+  const sorted = [...historyLog].sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
+
+  sorted.forEach(item => {
+    const card = document.createElement('div');
+    card.className = `history-card${item.starred ? ' starred' : ''}`;
+
+    const header = document.createElement('div');
+    header.className = 'history-card-header';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'history-card-time';
+    timeSpan.textContent = formatRelativeTime(item.timestamp);
+
+    const tagsDiv = document.createElement('div');
+    tagsDiv.className = 'history-card-tags';
+
+    if (item.fw) {
+      const tag = document.createElement('span');
+      tag.className = 'history-card-tag';
+      tag.textContent = item.fw;
+      tagsDiv.appendChild(tag);
+    }
+    if (item.st) {
+      const tag = document.createElement('span');
+      tag.className = 'history-card-tag';
+      tag.textContent = item.st;
+      tagsDiv.appendChild(tag);
+    }
+
+    header.appendChild(timeSpan);
+    header.appendChild(tagsDiv);
+
+    const body = document.createElement('div');
+    body.className = 'history-card-body';
+    body.textContent = item.prompt;
+
+    const actions = document.createElement('div');
+    actions.className = 'history-card-actions';
+
+    const starBtn = document.createElement('button');
+    starBtn.className = `hist-act-btn star${item.starred ? ' active' : ''}`;
+    starBtn.innerHTML = item.starred ? '★ Starred' : '☆ Star';
+    starBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleStarHistoryItem(item.id);
+    });
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'hist-act-btn';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(item.prompt).then(() => {
+        copyBtn.textContent = '✓';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1000);
+      });
+    });
+
+    const restoreBtn = document.createElement('button');
+    restoreBtn.className = 'hist-act-btn restore';
+    restoreBtn.textContent = 'Restore';
+    restoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      restoreHistoryItem(item);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'hist-act-btn delete';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteHistoryItem(item.id);
+    });
+
+    actions.appendChild(starBtn);
+    actions.appendChild(copyBtn);
+    actions.appendChild(restoreBtn);
+    actions.appendChild(delBtn);
+
+    card.appendChild(header);
+    card.appendChild(body);
+    card.appendChild(actions);
+
+    container.appendChild(card);
+  });
+}
+
+function toggleStarHistoryItem(id) {
+  historyLog = historyLog.map(item => {
+    if (item.id === id) {
+      return { ...item, starred: !item.starred };
+    }
+    return item;
+  });
+  saveHistoryToStorage();
+  renderHistory();
+}
+
+function deleteHistoryItem(id) {
+  historyLog = historyLog.filter(item => item.id !== id);
+  saveHistoryToStorage();
+  renderHistory();
+}
+
+function restoreHistoryItem(item) {
+  lastPrompt = item.prompt;
+  document.getElementById('output-box').textContent = lastPrompt;
+  document.getElementById('output-wrap').classList.add('visible');
+
+  const fwGroup = document.getElementById('fw-group');
+  if (fwGroup && item.fw) {
+    fwGroup.querySelectorAll('.pill').forEach(btn => {
+      if (btn.textContent.trim() === item.fw) {
+        selectPill(btn, 'fw-group');
+      }
+    });
+  }
+
+  const stGroup = document.getElementById('st-group');
+  if (stGroup && item.st) {
+    stGroup.querySelectorAll('.pill').forEach(btn => {
+      if (btn.textContent.trim() === item.st) {
+        selectPill(btn, 'st-group');
+      }
+    });
+  }
+
+  const clrInp = document.getElementById('clr-inp');
+  const nativePicker = document.getElementById('native-color-picker');
+  if (clrInp) {
+    clrInp.value = item.colors || '';
+    if (item.colors && /^#[0-9A-F]{6}$/i.test(item.colors.split(',')[0].trim())) {
+      const firstHex = item.colors.split(',')[0].trim();
+      if (nativePicker) {
+        nativePicker.value = firstHex;
+        nativePicker.parentElement.style.borderColor = firstHex;
+      }
+    } else if (nativePicker) {
+      nativePicker.parentElement.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+    }
+  }
+
+  const fntInp = document.getElementById('fnt-inp');
+  if (fntInp) {
+    fntInp.value = item.font || '';
+  }
+
+  document.getElementById('history-drawer').classList.remove('open');
+
+  const msg = document.createElement('div');
+  msg.style.position = 'absolute';
+  msg.style.top = '10px';
+  msg.style.left = '50%';
+  msg.style.transform = 'translateX(-50%)';
+  msg.style.background = 'var(--green)';
+  msg.style.color = '#000';
+  msg.style.padding = '4px 12px';
+  msg.style.borderRadius = '20px';
+  msg.style.fontSize = '11px';
+  msg.style.fontWeight = '600';
+  msg.style.zIndex = '10000';
+  msg.textContent = 'Prompt restored!';
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 1500);
+}
+
+function formatRelativeTime(epoch) {
+  const diff = Date.now() - epoch;
+  if (diff < 60000) return 'Just now';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return new Date(epoch).toLocaleDateString();
 }
 
 document.addEventListener('DOMContentLoaded', init);

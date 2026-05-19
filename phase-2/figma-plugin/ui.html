@@ -330,6 +330,155 @@
       outline: none;
     }
     .field-row input:focus { border-color: var(--border-bright); }
+
+    /* Figma Plugin History drawer */
+    .history-drawer {
+      position: absolute;
+      top: 0;
+      right: -100%;
+      width: 100%;
+      height: 100%;
+      background: #0f0b1a;
+      border-left: 1px solid var(--border-bright);
+      box-shadow: -10px 0 30px rgba(0,0,0,0.85);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .history-drawer.open {
+      right: 0;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text);
+    }
+
+    .history-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+
+    .history-clear-all {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .history-clear-all:hover { color: #F87171; text-decoration: underline; }
+
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .empty-history {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 30px;
+      font-style: italic;
+    }
+
+    .history-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+      text-align: left;
+    }
+
+    .history-card.starred {
+      border-color: rgba(245, 158, 11, 0.3);
+      background: rgba(245, 158, 11, 0.02);
+    }
+
+    .history-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .history-card-time {
+      font-size: 8.5px;
+      color: var(--text-dim);
+    }
+
+    .history-card-tags {
+      display: flex;
+      gap: 3px;
+    }
+
+    .history-card-tag {
+      font-size: 8.5px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .history-card-body {
+      font-size: 10.5px;
+      line-height: 1.4;
+      color: var(--text-muted);
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      text-overflow: ellipsis;
+      white-space: normal;
+      max-height: 30px;
+    }
+
+    .history-card-actions {
+      display: flex;
+      gap: 4px;
+      justify-content: flex-end;
+      margin-top: 2px;
+      border-top: 1px solid rgba(255,255,255,0.02);
+      padding-top: 4px;
+    }
+
+    .hist-act-btn {
+      background: transparent;
+      border: none;
+      padding: 2px 5px;
+      font-size: 9.5px;
+      border-radius: 3px;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+    .hist-act-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .hist-act-btn.restore { color: var(--accent); }
+    .hist-act-btn.star.active { color: #F59E0B; }
+    .hist-act-btn.delete:hover { color: #F87171; }
   </style>
 </head>
 <body>
@@ -337,6 +486,7 @@
   <div class="header-logo">
     <span class="logo-txt">PromptForge ⚡</span>
     <div>
+      <button class="settings-trigger" id="history-toggle" title="View prompt history" style="margin-right: 4px;">📚</button>
       <button class="settings-trigger" id="settings-toggle" title="Settings">⚙️</button>
       <span class="version">V1.0</span>
     </div>
@@ -414,6 +564,20 @@
           <button class="copy-opt-btn" id="opt-cursor">💻 Copy for Cursor / Windsurf</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Category 2: Saved / Prompt History Drawer -->
+  <div class="history-drawer" id="history-drawer">
+    <div class="history-header">
+      <span class="history-title">Prompt History</span>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="history-clear-all" id="history-clear-all" title="Clear all history entries">Clear all</button>
+        <button class="history-close-btn" id="history-close-btn">✕</button>
+      </div>
+    </div>
+    <div class="history-list" id="history-list">
+      <div class="empty-history" id="history-empty-msg">No prompt history found. Try generating above!</div>
     </div>
   </div>
 
@@ -540,6 +704,7 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
         lastPrompt = result;
         document.getElementById('output-box').textContent = lastPrompt;
         document.getElementById('output-wrap').classList.add('visible');
+        logPromptToHistory(lastPrompt);
       } catch (err) {
         alert('Prompt generation failed: ' + err.message);
       } finally {
@@ -595,6 +760,258 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
       const arrow = document.getElementById('dropdown-btn');
       arrow.textContent = '✓';
       setTimeout(() => { arrow.textContent = '▾'; }, 1500);
+    }
+
+    // Figma Plugin History Engine
+    let historyLog = [];
+
+    // Initialize history
+    setupHistory();
+
+    function setupHistory() {
+      const toggleBtn = document.getElementById('history-toggle');
+      const drawer = document.getElementById('history-drawer');
+      const closeBtn = document.getElementById('history-close-btn');
+      const clearAllBtn = document.getElementById('history-clear-all');
+
+      if (toggleBtn && drawer) {
+        toggleBtn.addEventListener('click', () => {
+          drawer.classList.toggle('open');
+          renderHistory();
+        });
+      }
+
+      if (closeBtn && drawer) {
+        closeBtn.addEventListener('click', () => {
+          drawer.classList.remove('open');
+        });
+      }
+
+      if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', () => {
+          if (confirm('Clear figma prompt history?')) {
+            historyLog = [];
+            saveHistoryToStorage();
+            renderHistory();
+          }
+        });
+      }
+
+      // Load cached logs
+      const cached = localStorage.getItem('figmaHistoryLog');
+      if (cached) {
+        try {
+          historyLog = JSON.parse(cached);
+          renderHistory();
+        } catch (e) {}
+      }
+    }
+
+    function logPromptToHistory(promptText) {
+      if (!promptText) return;
+      if (historyLog.length > 0 && historyLog[0].prompt === promptText) {
+        return;
+      }
+
+      const fw = getSelectedValue('fw-group') || 'React';
+      const st = getSelectedValue('st-group') || 'Pixel-perfect';
+
+      const historyObj = {
+        id: Date.now().toString(),
+        prompt: promptText,
+        fw: fw,
+        st: st,
+        timestamp: Date.now(),
+        starred: false
+      };
+
+      historyLog.unshift(historyObj);
+      if (historyLog.length > 20) {
+        historyLog = historyLog.slice(0, 20);
+      }
+
+      saveHistoryToStorage();
+    }
+
+    function saveHistoryToStorage() {
+      localStorage.setItem('figmaHistoryLog', JSON.stringify(historyLog));
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('history-list');
+      if (!container) return;
+
+      const clearBtn = document.getElementById('history-clear-all');
+      if (clearBtn) {
+        if (historyLog.length > 0) {
+          clearBtn.classList.remove('hidden');
+        } else {
+          clearBtn.classList.add('hidden');
+        }
+      }
+
+      container.innerHTML = '';
+
+      if (historyLog.length === 0) {
+        container.innerHTML = '<div class="empty-history" id="history-empty-msg">No prompt history found. Try generating above!</div>';
+        return;
+      }
+
+      const sorted = [...historyLog].sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
+
+      sorted.forEach(item => {
+        const card = document.createElement('div');
+        card.className = `history-card${item.starred ? ' starred' : ''}`;
+
+        const header = document.createElement('div');
+        header.className = 'history-card-header';
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'history-card-time';
+        timeSpan.textContent = formatRelativeTime(item.timestamp);
+
+        const tagsDiv = document.createElement('div');
+        tagsDiv.className = 'history-card-tags';
+
+        if (item.fw) {
+          const tag = document.createElement('span');
+          tag.className = 'history-card-tag';
+          tag.textContent = item.fw;
+          tagsDiv.appendChild(tag);
+        }
+        if (item.st) {
+          const tag = document.createElement('span');
+          tag.className = 'history-card-tag';
+          tag.textContent = item.st;
+          tagsDiv.appendChild(tag);
+        }
+
+        header.appendChild(timeSpan);
+        header.appendChild(tagsDiv);
+
+        const body = document.createElement('div');
+        body.className = 'history-card-body';
+        body.textContent = item.prompt;
+
+        const actions = document.createElement('div');
+        actions.className = 'history-card-actions';
+
+        const starBtn = document.createElement('button');
+        starBtn.className = `hist-act-btn star${item.starred ? ' active' : ''}`;
+        starBtn.innerHTML = item.starred ? '★ Starred' : '☆ Star';
+        starBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleStarHistoryItem(item.id);
+        });
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'hist-act-btn';
+        copyBtn.textContent = 'Copy';
+        copyBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          copyToClipboard(item.prompt);
+          copyBtn.textContent = '✓';
+          setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1000);
+        });
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'hist-act-btn restore';
+        restoreBtn.textContent = 'Restore';
+        restoreBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          restoreHistoryItem(item);
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'hist-act-btn delete';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteHistoryItem(item.id);
+        });
+
+        actions.appendChild(starBtn);
+        actions.appendChild(copyBtn);
+        actions.appendChild(restoreBtn);
+        actions.appendChild(delBtn);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        card.appendChild(actions);
+
+        container.appendChild(card);
+      });
+    }
+
+    function toggleStarHistoryItem(id) {
+      historyLog = historyLog.map(item => {
+        if (item.id === id) {
+          return { ...item, starred: !item.starred };
+        }
+        return item;
+      });
+      saveHistoryToStorage();
+      renderHistory();
+    }
+
+    function deleteHistoryItem(id) {
+      historyLog = historyLog.filter(item => item.id !== id);
+      saveHistoryToStorage();
+      renderHistory();
+    }
+
+    function restoreHistoryItem(item) {
+      lastPrompt = item.prompt;
+      document.getElementById('output-box').textContent = lastPrompt;
+      document.getElementById('output-wrap').classList.add('visible');
+
+      const fwGroup = document.getElementById('fw-group');
+      if (fwGroup && item.fw) {
+        fwGroup.querySelectorAll('.pill').forEach(btn => {
+          if (btn.textContent.trim() === item.fw) {
+            fwGroup.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+            btn.classList.add('on');
+          }
+        });
+      }
+
+      const stGroup = document.getElementById('st-group');
+      if (stGroup && item.st) {
+        stGroup.querySelectorAll('.pill').forEach(btn => {
+          if (btn.textContent.trim() === item.st) {
+            stGroup.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+            btn.classList.add('on');
+          }
+        });
+      }
+
+      document.getElementById('history-drawer').classList.remove('open');
+      
+      const msg = document.createElement('div');
+      msg.style.position = 'absolute';
+      msg.style.top = '10px';
+      msg.style.left = '50%';
+      msg.style.transform = 'translateX(-50%)';
+      msg.style.background = 'var(--green)';
+      msg.style.color = '#000';
+      msg.style.padding = '4px 12px';
+      msg.style.borderRadius = '20px';
+      msg.style.fontSize = '11px';
+      msg.style.fontWeight = '600';
+      msg.style.zIndex = '10000';
+      msg.textContent = 'Specs restored!';
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 1500);
+    }
+
+    function formatRelativeTime(epoch) {
+      const diff = Date.now() - epoch;
+      if (diff < 60000) return 'Just now';
+      const mins = Math.floor(diff / 60000);
+      if (mins < 60) return `${mins}m ago`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `${hours}h ago`;
+      return new Date(epoch).toLocaleDateString();
     }
   </script>
 </body>
