@@ -9,6 +9,7 @@ let activeAgent = 'claude';
 let apiKeys = { claude: '', gemini: '', openai: '', deepseek: '', groq: '', mistral: '' };
 let workspacePresets = [];
 let loadedDesignTokens = null;
+let activeTabVariables = null;
 
 function init() {
   setupTabs();
@@ -308,16 +309,42 @@ async function generate() {
   setLoading(true);
   document.getElementById('output-wrap').classList.remove('visible');
 
-  const instruction = buildInstruction(fw, st, colors, font, desc, urlVal);
-  
+  activeTabVariables = null;
   let screenshotDataUrl;
   if (currentTab === 'url') {
-    if (typeof chrome === 'undefined' || !chrome.tabs) {
+    if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.scripting) {
       showError('Extension API not available. Please load PromptForge as an unpacked extension in Chrome (chrome://extensions).');
       setLoading(false);
       return;
     }
     try {
+      const tabs = await new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+      });
+      const activeTab = tabs[0];
+      if (activeTab) {
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          files: ['content.js']
+        });
+
+        const response = await new Promise((resolve) => {
+          chrome.tabs.sendMessage(activeTab.id, { type: 'GET_DOM_SPECS' }, (res) => {
+            if (chrome.runtime.lastError) {
+              console.warn('DOM specs query warning:', chrome.runtime.lastError.message);
+              resolve(null);
+            } else {
+              resolve(res);
+            }
+          });
+        });
+
+        if (response && response.status === 'success') {
+          activeTabVariables = response.data;
+          console.log('Deep DOM specs extracted:', activeTabVariables);
+        }
+      }
+
       screenshotDataUrl = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(null, { format: 'png' }, function(dataUrl) {
           if (chrome.runtime.lastError) {
@@ -329,12 +356,14 @@ async function generate() {
       });
       console.log('Screenshot captured successfully');
     } catch (e) {
-      console.error('Failed to capture screenshot:', e);
-      showError('Failed to capture tab screenshot. Make sure you are on the active tab.');
+      console.error('Failed to capture tab context:', e);
+      showError('Failed to capture tab context. Make sure you are on the active tab.');
       setLoading(false);
       return;
     }
   }
+
+  const instruction = buildInstruction(fw, st, colors, font, desc, urlVal);
 
   let userContent;
 
@@ -534,11 +563,20 @@ function buildInstruction(fw, st, colors, font, desc, urlVal) {
     tokenInstructions = `\n\nStrictly adhere to the following project-specific design system tokens and style variables:\n${list}`;
   }
 
+  let extractedTabInstructions = '';
+  if (activeTabVariables && activeTabVariables.variables) {
+    const keys = Object.keys(activeTabVariables.variables);
+    if (keys.length > 0) {
+      const list = keys.map(k => `- ${k}: ${activeTabVariables.variables[k]}`).join('\n');
+      extractedTabInstructions = `\n\nAdditionally, enforce alignment with these computed styles extracted from the reference tab:\n${list}`;
+    }
+  }
+
   return `You are an expert UI/UX prompt engineer. Transform the following into the most precise, optimized prompt for building an exact UI.
 
 ${inputLine}
 Target framework: ${fw}
-Style direction: ${st}${colors ? `\nColor palette: ${colors}` : ''}${font ? `\nFont family: ${font}` : ''}${tokenInstructions}
+Style direction: ${st}${colors ? `\nColor palette: ${colors}` : ''}${font ? `\nFont family: ${font}` : ''}${tokenInstructions}${extractedTabInstructions}
 
 Write a hyper-detailed, engineer-ready prompt covering:
 - Exact layout structure and grid system
