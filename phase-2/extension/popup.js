@@ -11,6 +11,9 @@ let workspacePresets = [];
 let loadedDesignTokens = null;
 let activeTabVariables = null;
 let historyLog = [];
+let supabaseUrl = '';
+let supabaseKey = '';
+let userId = '';
 
 function init() {
   setupTabs();
@@ -729,7 +732,7 @@ function setupSettings() {
 
   // Load settings
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['apiKeys', 'activeAgent', 'mode', 'proxyUrl'], (result) => {
+    chrome.storage.local.get(['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId'], (result) => {
       if (result.apiKeys) apiKeys = result.apiKeys;
       if (result.activeAgent) {
         activeAgent = result.activeAgent;
@@ -743,6 +746,23 @@ function setupSettings() {
       }
       if (result.proxyUrl) document.getElementById('proxy-url-inp').value = result.proxyUrl;
       
+      // Load Supabase variables
+      if (result.supabaseUrl) {
+        supabaseUrl = result.supabaseUrl;
+        document.getElementById('supabase-url-inp').value = supabaseUrl;
+      }
+      if (result.supabaseKey) {
+        supabaseKey = result.supabaseKey;
+        document.getElementById('supabase-key-inp').value = supabaseKey;
+      }
+      
+      userId = result.userId || '';
+      if (!userId) {
+        userId = 'pf-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        chrome.storage.local.set({ userId });
+      }
+      document.getElementById('user-id-inp').value = userId;
+
       // Set initial API key value
       document.getElementById('api-key-inp').value = apiKeys[activeAgent] || '';
     });
@@ -754,10 +774,21 @@ function saveSettings() {
   apiKeys[activeAgent] = apiKey; // Save key for active agent
   
   const proxyUrl = document.getElementById('proxy-url-inp').value.trim();
+  supabaseUrl = document.getElementById('supabase-url-inp').value.trim();
+  supabaseKey = document.getElementById('supabase-key-inp').value.trim();
+  userId = document.getElementById('user-id-inp').value.trim();
+
+  if (!userId) {
+    userId = 'pf-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    document.getElementById('user-id-inp').value = userId;
+  }
   
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ apiKeys, activeAgent, mode, proxyUrl }, () => {
+    chrome.storage.local.set({ apiKeys, activeAgent, mode, proxyUrl, supabaseUrl, supabaseKey, userId }, () => {
       console.log('Settings saved');
+      // Trigger sync
+      syncPresetsFromCloud();
+      syncHistoryFromCloud();
     });
   }
   
@@ -863,6 +894,7 @@ function setupPresets() {
 
       workspacePresets.push(presetObj);
       savePresetsToStorage();
+      uploadPresetToCloud(presetObj);
       renderPresets();
       
       saveRow.classList.add('hidden');
@@ -876,6 +908,8 @@ function setupPresets() {
         workspacePresets = result.workspacePresets;
         renderPresets();
       }
+      // Sync from cloud on boot
+      syncPresetsFromCloud();
     });
   }
 }
@@ -917,6 +951,7 @@ function renderPresets() {
       e.stopPropagation();
       workspacePresets = workspacePresets.filter(item => item.id !== p.id);
       savePresetsToStorage();
+      deletePresetFromCloud(p.id);
       renderPresets();
     });
     
@@ -1187,6 +1222,7 @@ function setupHistory() {
       if (confirm('Are you sure you want to clear your prompt history?')) {
         historyLog = [];
         saveHistoryToStorage();
+        clearAllHistoryFromCloud();
         renderHistory();
       }
     });
@@ -1198,6 +1234,8 @@ function setupHistory() {
         historyLog = result.historyLog;
         renderHistory();
       }
+      // Trigger cloud sync
+      syncHistoryFromCloud();
     });
   }
 }
@@ -1232,6 +1270,7 @@ function logPromptToHistory(promptText) {
   }
 
   saveHistoryToStorage();
+  uploadHistoryToCloud(historyObj);
 }
 
 function saveHistoryToStorage() {
@@ -1350,19 +1389,23 @@ function renderHistory() {
 }
 
 function toggleStarHistoryItem(id) {
+  let starredState = false;
   historyLog = historyLog.map(item => {
     if (item.id === id) {
-      return { ...item, starred: !item.starred };
+      starredState = !item.starred;
+      return { ...item, starred: starredState };
     }
     return item;
   });
   saveHistoryToStorage();
+  toggleStarHistoryItemInCloud(id, starredState);
   renderHistory();
 }
 
 function deleteHistoryItem(id) {
   historyLog = historyLog.filter(item => item.id !== id);
   saveHistoryToStorage();
+  deleteHistoryItemFromCloud(id);
   renderHistory();
 }
 
@@ -1436,6 +1479,174 @@ function formatRelativeTime(epoch) {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   return new Date(epoch).toLocaleDateString();
+}
+
+// Supabase REST client synchronization helpers
+function getSupabaseHeaders() {
+  return {
+    'apikey': supabaseKey,
+    'Authorization': `Bearer ${supabaseKey}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+}
+
+async function syncPresetsFromCloud() {
+  if (!supabaseUrl || !supabaseKey || !userId) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/workspace_presets?user_id=eq.${userId}&select=*`, {
+      headers: getSupabaseHeaders()
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data && Array.isArray(data)) {
+      workspacePresets = data.map(d => ({
+        id: d.id,
+        name: d.name,
+        fw: d.fw,
+        st: d.st,
+        colors: d.colors,
+        font: d.font
+      }));
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ workspacePresets });
+      }
+      renderPresets();
+      console.log('Sync cloud presets count:', workspacePresets.length);
+    }
+  } catch (e) {
+    console.warn('Supabase sync presets offline:', e.message);
+  }
+}
+
+async function uploadPresetToCloud(preset) {
+  if (!supabaseUrl || !supabaseKey || !userId) return;
+  try {
+    const payload = {
+      id: preset.id,
+      user_id: userId,
+      name: preset.name,
+      fw: preset.fw,
+      st: preset.st,
+      colors: preset.colors,
+      font: preset.font
+    };
+    await fetch(`${supabaseUrl}/rest/v1/workspace_presets`, {
+      method: 'POST',
+      headers: {
+        ...getSupabaseHeaders(),
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    console.warn('Supabase upload preset error:', e.message);
+  }
+}
+
+async function deletePresetFromCloud(presetId) {
+  if (!supabaseUrl || !supabaseKey || !userId) return;
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/workspace_presets?id=eq.${presetId}`, {
+      method: 'DELETE',
+      headers: getSupabaseHeaders()
+    });
+  } catch (e) {
+    console.warn('Supabase delete preset error:', e.message);
+  }
+}
+
+async function syncHistoryFromCloud() {
+  if (!supabaseUrl || !supabaseKey || !userId) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/prompt_history?user_id=eq.${userId}&select=*&order=created_at.desc`, {
+      headers: getSupabaseHeaders()
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data && Array.isArray(data)) {
+      historyLog = data.map(d => ({
+        id: d.id,
+        prompt: d.prompt,
+        fw: d.fw,
+        st: d.st,
+        colors: d.colors,
+        font: d.font,
+        timestamp: new Date(d.created_at).getTime(),
+        starred: d.starred
+      }));
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ historyLog });
+      }
+      renderHistory();
+      console.log('Sync cloud history logs count:', historyLog.length);
+    }
+  } catch (e) {
+    console.warn('Supabase sync history offline:', e.message);
+  }
+}
+
+async function uploadHistoryToCloud(item) {
+  if (!supabaseUrl || !supabaseKey || !userId) return;
+  try {
+    const payload = {
+      id: item.id,
+      user_id: userId,
+      prompt: item.prompt,
+      fw: item.fw,
+      st: item.st,
+      colors: item.colors,
+      font: item.font,
+      starred: item.starred
+    };
+    await fetch(`${supabaseUrl}/rest/v1/prompt_history`, {
+      method: 'POST',
+      headers: {
+        ...getSupabaseHeaders(),
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    console.warn('Supabase upload history error:', e.message);
+  }
+}
+
+async function toggleStarHistoryItemInCloud(id, starred) {
+  if (!supabaseUrl || !supabaseKey || !userId) return;
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/prompt_history?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: getSupabaseHeaders(),
+      body: JSON.stringify({ starred })
+    });
+  } catch (e) {
+    console.warn('Supabase toggle star error:', e.message);
+  }
+}
+
+async function deleteHistoryItemFromCloud(id) {
+  if (!supabaseUrl || !supabaseKey || !userId) return;
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/prompt_history?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: getSupabaseHeaders()
+    });
+  } catch (e) {
+    console.warn('Supabase delete history error:', e.message);
+  }
+}
+
+async function clearAllHistoryFromCloud() {
+  if (!supabaseUrl || !supabaseKey || !userId) return;
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/prompt_history?user_id=eq.${userId}`, {
+      method: 'DELETE',
+      headers: getSupabaseHeaders()
+    });
+  } catch (e) {
+    console.warn('Supabase clear history error:', e.message);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

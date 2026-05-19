@@ -502,6 +502,18 @@
       <span class="opt-label">Java Proxy URL</span>
       <input type="text" id="proxy-url" value="http://localhost:8080">
     </div>
+    <div class="field-row" style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px;">
+      <span class="opt-label">Supabase URL</span>
+      <input type="text" id="supabase-url" placeholder="https://xyz.supabase.co">
+    </div>
+    <div class="field-row">
+      <span class="opt-label">Supabase Anon Key</span>
+      <input type="password" id="supabase-key" placeholder="public-anon-key">
+    </div>
+    <div class="field-row">
+      <span class="opt-label">Profile Identifier</span>
+      <input type="text" id="user-id" placeholder="Generated automatically if empty">
+    </div>
     <button class="gen-btn" id="settings-save-btn" style="padding: 6px; font-size: 11.5px;">Save configurations</button>
   </div>
 
@@ -588,6 +600,31 @@
     // Settings storage keys
     let geminiKey = '';
     let proxyUrl = 'http://localhost:8080';
+    let supabaseUrl = '';
+    let supabaseKey = '';
+    let userId = '';
+
+    // Load initial settings on boot
+    loadSettings();
+
+    function loadSettings() {
+      geminiKey = localStorage.getItem('figmaGeminiKey') || '';
+      proxyUrl = localStorage.getItem('figmaProxyUrl') || 'http://localhost:8080';
+      supabaseUrl = localStorage.getItem('figmaSupabaseUrl') || '';
+      supabaseKey = localStorage.getItem('figmaSupabaseKey') || '';
+      userId = localStorage.getItem('figmaUserId') || '';
+
+      if (!userId) {
+        userId = 'pf-figma-' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('figmaUserId', userId);
+      }
+
+      document.getElementById('gemini-key').value = geminiKey;
+      document.getElementById('proxy-url').value = proxyUrl;
+      document.getElementById('supabase-url').value = supabaseUrl;
+      document.getElementById('supabase-key').value = supabaseKey;
+      document.getElementById('user-id').value = userId;
+    }
 
     // UI events setup
     document.getElementById('settings-toggle').addEventListener('click', () => {
@@ -597,8 +634,26 @@
     document.getElementById('settings-save-btn').addEventListener('click', () => {
       geminiKey = document.getElementById('gemini-key').value.trim();
       proxyUrl = document.getElementById('proxy-url').value.trim();
+      supabaseUrl = document.getElementById('supabase-url').value.trim();
+      supabaseKey = document.getElementById('supabase-key').value.trim();
+      userId = document.getElementById('user-id').value.trim();
+
+      if (!userId) {
+        userId = 'pf-figma-' + Math.random().toString(36).substring(2, 15);
+        document.getElementById('user-id').value = userId;
+      }
+
+      localStorage.setItem('figmaGeminiKey', geminiKey);
+      localStorage.setItem('figmaProxyUrl', proxyUrl);
+      localStorage.setItem('figmaSupabaseUrl', supabaseUrl);
+      localStorage.setItem('figmaSupabaseKey', supabaseKey);
+      localStorage.setItem('figmaUserId', userId);
+
       document.getElementById('settings-drawer').classList.add('hidden');
       alert('Settings cached locally.');
+      
+      // Trigger cloud sync
+      syncHistoryFromCloud();
     });
 
     // Scan node trigger message
@@ -792,6 +847,7 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
           if (confirm('Clear figma prompt history?')) {
             historyLog = [];
             saveHistoryToStorage();
+            clearAllHistoryFromCloud();
             renderHistory();
           }
         });
@@ -805,6 +861,9 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
           renderHistory();
         } catch (e) {}
       }
+
+      // Sync from cloud on boot
+      syncHistoryFromCloud();
     }
 
     function logPromptToHistory(promptText) {
@@ -831,6 +890,7 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
       }
 
       saveHistoryToStorage();
+      uploadHistoryToCloud(historyObj);
     }
 
     function saveHistoryToStorage() {
@@ -944,19 +1004,23 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
     }
 
     function toggleStarHistoryItem(id) {
+      let starredState = false;
       historyLog = historyLog.map(item => {
         if (item.id === id) {
-          return { ...item, starred: !item.starred };
+          starredState = !item.starred;
+          return { ...item, starred: starredState };
         }
         return item;
       });
       saveHistoryToStorage();
+      toggleStarHistoryItemInCloud(id, starredState);
       renderHistory();
     }
 
     function deleteHistoryItem(id) {
       historyLog = historyLog.filter(item => item.id !== id);
       saveHistoryToStorage();
+      deleteHistoryItemFromCloud(id);
       renderHistory();
     }
 
@@ -1012,6 +1076,103 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
       const hours = Math.floor(mins / 60);
       if (hours < 24) return `${hours}h ago`;
       return new Date(epoch).toLocaleDateString();
+    }
+
+    // Supabase REST client synchronization helpers
+    function getSupabaseHeaders() {
+      return {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      };
+    }
+
+    async function syncHistoryFromCloud() {
+      if (!supabaseUrl || !supabaseKey || !userId) return;
+      try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/prompt_history?user_id=eq.${userId}&select=*&order=created_at.desc`, {
+          headers: getSupabaseHeaders()
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data && Array.isArray(data)) {
+          historyLog = data.map(d => ({
+            id: d.id,
+            prompt: d.prompt,
+            fw: d.fw,
+            st: d.st,
+            timestamp: new Date(d.created_at).getTime(),
+            starred: d.starred
+          }));
+          localStorage.setItem('figmaHistoryLog', JSON.stringify(historyLog));
+          renderHistory();
+          console.log('Sync Figma history logs count:', historyLog.length);
+        }
+      } catch (e) {
+        console.warn('Supabase sync history offline:', e.message);
+      }
+    }
+
+    async function uploadHistoryToCloud(item) {
+      if (!supabaseUrl || !supabaseKey || !userId) return;
+      try {
+        const payload = {
+          id: item.id,
+          user_id: userId,
+          prompt: item.prompt,
+          fw: item.fw,
+          st: item.st,
+          starred: item.starred
+        };
+        await fetch(`${supabaseUrl}/rest/v1/prompt_history`, {
+          method: 'POST',
+          headers: {
+            ...getSupabaseHeaders(),
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        console.warn('Supabase upload history error:', e.message);
+      }
+    }
+
+    async function toggleStarHistoryItemInCloud(id, starred) {
+      if (!supabaseUrl || !supabaseKey || !userId) return;
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/prompt_history?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: getSupabaseHeaders(),
+          body: JSON.stringify({ starred })
+        });
+      } catch (e) {
+        console.warn('Supabase toggle star error:', e.message);
+      }
+    }
+
+    async function deleteHistoryItemFromCloud(id) {
+      if (!supabaseUrl || !supabaseKey || !userId) return;
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/prompt_history?id=eq.${id}`, {
+          method: 'DELETE',
+          headers: getSupabaseHeaders()
+        });
+      } catch (e) {
+        console.warn('Supabase delete history error:', e.message);
+      }
+    }
+
+    async function clearAllHistoryFromCloud() {
+      if (!supabaseUrl || !supabaseKey || !userId) return;
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/prompt_history?user_id=eq.${userId}`, {
+          method: 'DELETE',
+          headers: getSupabaseHeaders()
+        });
+      } catch (e) {
+        console.warn('Supabase clear history error:', e.message);
+      }
     }
   </script>
 </body>

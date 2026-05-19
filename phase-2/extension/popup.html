@@ -329,6 +329,20 @@
         <button class="dev-mode-btn" id="dev-mode-toggle">⚙️ Developer options</button>
       </div>
       
+      <!-- Supabase cloud sync configurations -->
+      <div class="settings-field mt-10" style="border-top: 1px solid var(--border); padding-top: 10px;">
+        <span class="settings-lbl">Supabase Project URL</span>
+        <input class="settings-input" id="supabase-url-inp" type="text" placeholder="https://your-project.supabase.co">
+      </div>
+      <div class="settings-field">
+        <span class="settings-lbl">Supabase Anon Key</span>
+        <input class="settings-input" id="supabase-key-inp" type="password" placeholder="public-anon-key">
+      </div>
+      <div class="settings-field">
+        <span class="settings-lbl">Profile Identifier</span>
+        <input class="settings-input" id="user-id-inp" type="text" placeholder="Generated automatically if empty">
+      </div>
+      
       <button class="save-btn" id="save-btn">Save settings</button>
       <button class="act-btn mt-6" id="clear-cache-btn">Clear Saved Keys</button>
     </div>
