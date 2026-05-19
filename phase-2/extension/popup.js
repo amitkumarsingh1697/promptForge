@@ -11,9 +11,10 @@ let workspacePresets = [];
 let loadedDesignTokens = null;
 let activeTabVariables = null;
 let historyLog = [];
-let supabaseUrl = '';
-let supabaseKey = '';
+let supabaseUrl = 'https://ywlvbitacvemgkndmfef.supabase.co';
+let supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bHZiaXRhY3ZlbWdrbmRtZmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTM0NjcsImV4cCI6MjA5NDc2OTQ2N30.diLEK6xnzQj1hBH6G2NFq0uTuC8xJHlHX6hkwYfwAqQ';
 let userId = '';
+let teamId = '';
 
 function init() {
   setupTabs();
@@ -732,7 +733,7 @@ function setupSettings() {
 
   // Load settings
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId'], (result) => {
+    chrome.storage.local.get(['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId', 'teamId'], (result) => {
       if (result.apiKeys) apiKeys = result.apiKeys;
       if (result.activeAgent) {
         activeAgent = result.activeAgent;
@@ -763,6 +764,11 @@ function setupSettings() {
       }
       document.getElementById('user-id-inp').value = userId;
 
+      if (result.teamId) {
+        teamId = result.teamId;
+        document.getElementById('team-id-inp').value = teamId;
+      }
+
       // Set initial API key value
       document.getElementById('api-key-inp').value = apiKeys[activeAgent] || '';
     });
@@ -777,6 +783,7 @@ function saveSettings() {
   supabaseUrl = document.getElementById('supabase-url-inp').value.trim();
   supabaseKey = document.getElementById('supabase-key-inp').value.trim();
   userId = document.getElementById('user-id-inp').value.trim();
+  teamId = document.getElementById('team-id-inp').value.trim();
 
   if (!userId) {
     userId = 'pf-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -784,7 +791,7 @@ function saveSettings() {
   }
   
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ apiKeys, activeAgent, mode, proxyUrl, supabaseUrl, supabaseKey, userId }, () => {
+    chrome.storage.local.set({ apiKeys, activeAgent, mode, proxyUrl, supabaseUrl, supabaseKey, userId, teamId }, () => {
       console.log('Settings saved');
       // Trigger sync
       syncPresetsFromCloud();
@@ -883,13 +890,16 @@ function setupPresets() {
       const colors = document.getElementById('clr-inp').value.trim();
       const font = document.getElementById('fnt-inp').value.trim();
       
+      const shareTeam = document.getElementById('preset-share-team') ? document.getElementById('preset-share-team').checked : false;
+      
       const presetObj = {
         id: Date.now().toString(),
         name: name,
         fw: fw,
         st: st,
         colors: colors,
-        font: font
+        font: font,
+        team_id: shareTeam ? teamId : ''
       };
 
       workspacePresets.push(presetObj);
@@ -897,6 +907,7 @@ function setupPresets() {
       uploadPresetToCloud(presetObj);
       renderPresets();
       
+      if (document.getElementById('preset-share-team')) document.getElementById('preset-share-team').checked = false;
       saveRow.classList.add('hidden');
       nameInp.value = '';
     });
@@ -940,7 +951,7 @@ function renderPresets() {
     
     const nameSpan = document.createElement('span');
     nameSpan.className = 'preset-pill-name';
-    nameSpan.textContent = p.name;
+    nameSpan.textContent = (p.team_id ? '👥 ' : '') + p.name;
     
     const delBtn = document.createElement('button');
     delBtn.className = 'preset-pill-del';
@@ -1494,7 +1505,12 @@ function getSupabaseHeaders() {
 async function syncPresetsFromCloud() {
   if (!supabaseUrl || !supabaseKey || !userId) return;
   try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/workspace_presets?user_id=eq.${userId}&select=*`, {
+    let queryUrl = `${supabaseUrl}/rest/v1/workspace_presets?user_id=eq.${userId}&select=*`;
+    if (teamId) {
+      queryUrl = `${supabaseUrl}/rest/v1/workspace_presets?or=(user_id.eq.${userId},team_id.eq.${teamId})&select=*`;
+    }
+    
+    const res = await fetch(queryUrl, {
       headers: getSupabaseHeaders()
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1506,7 +1522,8 @@ async function syncPresetsFromCloud() {
         fw: d.fw,
         st: d.st,
         colors: d.colors,
-        font: d.font
+        font: d.font,
+        team_id: d.team_id
       }));
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
         chrome.storage.local.set({ workspacePresets });
@@ -1529,7 +1546,8 @@ async function uploadPresetToCloud(preset) {
       fw: preset.fw,
       st: preset.st,
       colors: preset.colors,
-      font: preset.font
+      font: preset.font,
+      team_id: preset.team_id || ''
     };
     await fetch(`${supabaseUrl}/rest/v1/workspace_presets`, {
       method: 'POST',

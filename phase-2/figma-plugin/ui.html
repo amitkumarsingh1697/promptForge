@@ -479,6 +479,34 @@
     .hist-act-btn.restore { color: var(--accent); }
     .hist-act-btn.star.active { color: #F59E0B; }
     .hist-act-btn.delete:hover { color: #F87171; }
+
+    /* Workspace Presets styles inside Figma Companion */
+    .preset-save-link {
+      background: transparent;
+      border: none;
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .preset-save-link:hover { text-decoration: underline; }
+    
+    .preset-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(124, 106, 250, 0.08);
+      border: 1px solid rgba(124, 106, 250, 0.25);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .preset-pill:hover { background: rgba(124, 106, 250, 0.15); }
+    .preset-pill-del { background: transparent; border: none; color: var(--text-muted); font-size: 9px; cursor: pointer; padding: 0 2px; }
+    .preset-pill-del:hover { color: #F87171; }
   </style>
 </head>
 <body>
@@ -530,6 +558,26 @@
         <div class="sel-sub" id="sel-node-desc">Frame Node · 5 width, 8 height</div>
       </div>
       <button class="badge-btn" id="scan-node-btn">Scan selection</button>
+    </div>
+  </div>
+
+  <!-- Task 6: Workspace Presets Engine -->
+  <div class="options-block">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+      <span class="opt-label" style="margin-bottom: 0;">Workspace Presets</span>
+      <button class="preset-save-link" id="preset-save-link" title="Save active config combo">+ Save loadout</button>
+    </div>
+    <div class="preset-save-row hidden" id="preset-save-row" style="flex-wrap: wrap; gap: 6px; display: flex; margin-bottom: 6px;">
+      <input class="extra-input" id="preset-name-inp" type="text" placeholder="e.g. SaaS Dashboard" maxlength="20" style="flex: 1; min-width: 120px; padding: 5px 8px; font-size: 11px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: white; outline: none; border-radius: 6px;">
+      <button class="preset-btn-action confirm" id="preset-save-confirm" style="background: var(--green-dim); color: var(--green); border: none; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;">Save</button>
+      <button class="preset-btn-action cancel" id="preset-save-cancel" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: none; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;">✕</button>
+      <div style="width: 100%; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+        <input type="checkbox" id="preset-share-team" style="cursor: pointer; width: auto; margin: 0;">
+        <label for="preset-share-team" style="font-size: 10.5px; color: var(--text-muted); cursor: pointer; user-select: none;">Share with Team Space</label>
+      </div>
+    </div>
+    <div class="pill-group" id="presets-container">
+      <span class="empty-presets" id="empty-presets-msg" style="font-size: 11px; color: var(--text-dim); font-style: italic;">No presets saved. Configure below to save loadouts.</span>
     </div>
   </div>
 
@@ -600,9 +648,10 @@
     // Settings storage keys
     let geminiKey = '';
     let proxyUrl = 'http://localhost:8080';
-    let supabaseUrl = '';
-    let supabaseKey = '';
+    let supabaseUrl = 'https://ywlvbitacvemgkndmfef.supabase.co';
+    let supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bHZiaXRhY3ZlbWdrbmRtZmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTM0NjcsImV4cCI6MjA5NDc2OTQ2N30.diLEK6xnzQj1hBH6G2NFq0uTuC8xJHlHX6hkwYfwAqQ';
     let userId = '';
+    let teamId = '';
 
     // Load initial settings on boot
     loadSettings();
@@ -610,9 +659,10 @@
     function loadSettings() {
       geminiKey = localStorage.getItem('figmaGeminiKey') || '';
       proxyUrl = localStorage.getItem('figmaProxyUrl') || 'http://localhost:8080';
-      supabaseUrl = localStorage.getItem('figmaSupabaseUrl') || '';
-      supabaseKey = localStorage.getItem('figmaSupabaseKey') || '';
+      supabaseUrl = localStorage.getItem('figmaSupabaseUrl') || 'https://ywlvbitacvemgkndmfef.supabase.co';
+      supabaseKey = localStorage.getItem('figmaSupabaseKey') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bHZiaXRhY3ZlbWdrbmRtZmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTM0NjcsImV4cCI6MjA5NDc2OTQ2N30.diLEK6xnzQj1hBH6G2NFq0uTuC8xJHlHX6hkwYfwAqQ';
       userId = localStorage.getItem('figmaUserId') || '';
+      teamId = localStorage.getItem('figmaTeamId') || '';
 
       if (!userId) {
         userId = 'pf-figma-' + Math.random().toString(36).substring(2, 15);
@@ -624,6 +674,7 @@
       document.getElementById('supabase-url').value = supabaseUrl;
       document.getElementById('supabase-key').value = supabaseKey;
       document.getElementById('user-id').value = userId;
+      document.getElementById('team-id').value = teamId;
     }
 
     // UI events setup
@@ -637,6 +688,7 @@
       supabaseUrl = document.getElementById('supabase-url').value.trim();
       supabaseKey = document.getElementById('supabase-key').value.trim();
       userId = document.getElementById('user-id').value.trim();
+      teamId = document.getElementById('team-id').value.trim();
 
       if (!userId) {
         userId = 'pf-figma-' + Math.random().toString(36).substring(2, 15);
@@ -648,12 +700,14 @@
       localStorage.setItem('figmaSupabaseUrl', supabaseUrl);
       localStorage.setItem('figmaSupabaseKey', supabaseKey);
       localStorage.setItem('figmaUserId', userId);
+      localStorage.setItem('figmaTeamId', teamId);
 
       document.getElementById('settings-drawer').classList.add('hidden');
       alert('Settings cached locally.');
       
       // Trigger cloud sync
       syncHistoryFromCloud();
+      syncPresetsFromCloud();
     });
 
     // Scan node trigger message
@@ -811,10 +865,229 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
       document.body.removeChild(el);
     }
 
-    function showConfirmMessage() {
-      const arrow = document.getElementById('dropdown-btn');
-      arrow.textContent = '✓';
-      setTimeout(() => { arrow.textContent = '▾'; }, 1500);
+    // Figma Plugin Workspace Presets Engine
+    let workspacePresets = [];
+
+    setupPresets();
+
+    function setupPresets() {
+      const linkBtn = document.getElementById('preset-save-link');
+      const saveRow = document.getElementById('preset-save-row');
+      const nameInp = document.getElementById('preset-name-inp');
+      const confirmBtn = document.getElementById('preset-save-confirm');
+      const cancelBtn = document.getElementById('preset-save-cancel');
+      
+      if (linkBtn && saveRow) {
+        linkBtn.addEventListener('click', () => {
+          if (workspacePresets.length >= 3) {
+            alert('Maximum 3 presets allowed. Please delete an existing preset first.');
+            return;
+          }
+          saveRow.classList.remove('hidden');
+          nameInp.focus();
+        });
+
+        cancelBtn.addEventListener('click', () => {
+          saveRow.classList.add('hidden');
+          nameInp.value = '';
+        });
+
+        confirmBtn.addEventListener('click', () => {
+          const name = nameInp.value.trim();
+          if (!name) {
+            alert('Please enter a preset name.');
+            return;
+          }
+          
+          const fw = getSelectedValue('fw-group') || 'React';
+          const st = getSelectedValue('st-group') || 'Pixel-perfect';
+          const shareTeam = document.getElementById('preset-share-team') ? document.getElementById('preset-share-team').checked : false;
+          
+          const presetObj = {
+            id: Date.now().toString(),
+            name: name,
+            fw: fw,
+            st: st,
+            colors: '',
+            font: '',
+            team_id: shareTeam ? teamId : ''
+          };
+
+          workspacePresets.push(presetObj);
+          savePresetsToStorage();
+          uploadPresetToCloud(presetObj);
+          renderPresets();
+          
+          if (document.getElementById('preset-share-team')) document.getElementById('preset-share-team').checked = false;
+          saveRow.classList.add('hidden');
+          nameInp.value = '';
+        });
+      }
+
+      const cached = localStorage.getItem('figmaWorkspacePresets');
+      if (cached) {
+        try {
+          workspacePresets = JSON.parse(cached);
+          renderPresets();
+        } catch (e) {}
+      }
+      
+      syncPresetsFromCloud();
+    }
+
+    function savePresetsToStorage() {
+      localStorage.setItem('figmaWorkspacePresets', JSON.stringify(workspacePresets));
+    }
+
+    function renderPresets() {
+      const container = document.getElementById('presets-container');
+      if (!container) return;
+
+      container.innerHTML = '';
+      
+      if (workspacePresets.length === 0) {
+        container.innerHTML = '<span class="empty-presets" id="empty-presets-msg" style="font-size: 11px; color: var(--text-dim); font-style: italic;">No presets saved. Configure below to save loadouts.</span>';
+        return;
+      }
+
+      workspacePresets.forEach(p => {
+        const pill = document.createElement('div');
+        pill.className = 'preset-pill';
+        pill.title = `Load: ${p.fw} · ${p.st}`;
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'preset-pill-name';
+        nameSpan.textContent = (p.team_id ? '👥 ' : '') + p.name;
+        
+        const delBtn = document.createElement('button');
+        delBtn.className = 'preset-pill-del';
+        delBtn.title = 'Delete preset';
+        delBtn.textContent = '✕';
+        
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          workspacePresets = workspacePresets.filter(item => item.id !== p.id);
+          savePresetsToStorage();
+          deletePresetFromCloud(p.id);
+          renderPresets();
+        });
+        
+        pill.appendChild(nameSpan);
+        pill.appendChild(delBtn);
+        
+        pill.addEventListener('click', () => {
+          loadPreset(p);
+        });
+        
+        container.appendChild(pill);
+      });
+    }
+
+    function loadPreset(p) {
+      const fwGroup = document.getElementById('fw-group');
+      if (fwGroup && p.fw) {
+        fwGroup.querySelectorAll('.pill').forEach(btn => {
+          if (btn.textContent.trim() === p.fw) {
+            fwGroup.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+            btn.classList.add('on');
+          }
+        });
+      }
+      
+      const stGroup = document.getElementById('st-group');
+      if (stGroup && p.st) {
+        stGroup.querySelectorAll('.pill').forEach(btn => {
+          if (btn.textContent.trim() === p.st) {
+            stGroup.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+            btn.classList.add('on');
+          }
+        });
+      }
+      
+      const msg = document.createElement('div');
+      msg.style.position = 'absolute';
+      msg.style.top = '10px';
+      msg.style.left = '50%';
+      msg.style.transform = 'translateX(-50%)';
+      msg.style.background = 'var(--green)';
+      msg.style.color = '#000';
+      msg.style.padding = '4px 12px';
+      msg.style.borderRadius = '20px';
+      msg.style.fontSize = '11px';
+      msg.style.fontWeight = '600';
+      msg.style.zIndex = '10000';
+      msg.textContent = `Loaded preset: ${p.name}`;
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 1500);
+    }
+
+    async function syncPresetsFromCloud() {
+      if (!supabaseUrl || !supabaseKey || !userId) return;
+      try {
+        let queryUrl = `${supabaseUrl}/rest/v1/workspace_presets?user_id=eq.${userId}&select=*`;
+        if (teamId) {
+          queryUrl = `${supabaseUrl}/rest/v1/workspace_presets?or=(user_id.eq.${userId},team_id.eq.${teamId})&select=*`;
+        }
+        const res = await fetch(queryUrl, {
+          headers: getSupabaseHeaders()
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data && Array.isArray(data)) {
+          workspacePresets = data.map(d => ({
+            id: d.id,
+            name: d.name,
+            fw: d.fw,
+            st: d.st,
+            colors: d.colors,
+            font: d.font,
+            team_id: d.team_id
+          }));
+          localStorage.setItem('figmaWorkspacePresets', JSON.stringify(workspacePresets));
+          renderPresets();
+          console.log('Sync cloud presets count:', workspacePresets.length);
+        }
+      } catch (e) {
+        console.warn('Supabase sync presets offline:', e.message);
+      }
+    }
+
+    async function uploadPresetToCloud(preset) {
+      if (!supabaseUrl || !supabaseKey || !userId) return;
+      try {
+        const payload = {
+          id: preset.id,
+          user_id: userId,
+          name: preset.name,
+          fw: preset.fw,
+          st: preset.st,
+          colors: preset.colors,
+          font: preset.font,
+          team_id: preset.team_id || ''
+        };
+        await fetch(`${supabaseUrl}/rest/v1/workspace_presets`, {
+          method: 'POST',
+          headers: {
+            ...getSupabaseHeaders(),
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        console.warn('Supabase upload preset error:', e.message);
+      }
+    }
+
+    async function deletePresetFromCloud(presetId) {
+      if (!supabaseUrl || !supabaseKey || !userId) return;
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/workspace_presets?id=eq.${presetId}`, {
+          method: 'DELETE',
+          headers: getSupabaseHeaders()
+        });
+      } catch (e) {
+        console.warn('Supabase delete preset error:', e.message);
+      }
     }
 
     // Figma Plugin History Engine

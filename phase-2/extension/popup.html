@@ -184,10 +184,14 @@
         <span class="opt-label" style="margin-bottom: 0;">Workspace Presets</span>
         <button class="preset-save-link" id="preset-save-link" title="Save active config combo">+ Save loadout</button>
       </div>
-      <div class="preset-save-row hidden" id="preset-save-row">
-        <input class="extra-input" id="preset-name-inp" type="text" placeholder="e.g. SaaS Dashboard" maxlength="20" style="flex: 1; padding: 5px 8px; font-size: 11px;">
+      <div class="preset-save-row hidden" id="preset-save-row" style="flex-wrap: wrap; gap: 6px;">
+        <input class="extra-input" id="preset-name-inp" type="text" placeholder="e.g. SaaS Dashboard" maxlength="20" style="flex: 1; min-width: 120px; padding: 5px 8px; font-size: 11px;">
         <button class="preset-btn-action confirm" id="preset-save-confirm">Save</button>
         <button class="preset-btn-action cancel" id="preset-save-cancel">✕</button>
+        <div style="width: 100%; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+          <input type="checkbox" id="preset-share-team" style="cursor: pointer; width: auto; margin: 0;">
+          <label for="preset-share-team" style="font-size: 10.5px; color: var(--text-muted); cursor: pointer; user-select: none;">Share with Team Space</label>
+        </div>
       </div>
       <div class="pill-group" id="presets-container">
         <span class="empty-presets" id="empty-presets-msg">No presets saved. Configure above to save loadouts.</span>
@@ -332,15 +336,19 @@
       <!-- Supabase cloud sync configurations -->
       <div class="settings-field mt-10" style="border-top: 1px solid var(--border); padding-top: 10px;">
         <span class="settings-lbl">Supabase Project URL</span>
-        <input class="settings-input" id="supabase-url-inp" type="text" placeholder="https://your-project.supabase.co">
+        <input class="settings-input" id="supabase-url-inp" type="text" value="https://ywlvbitacvemgkndmfef.supabase.co">
       </div>
       <div class="settings-field">
         <span class="settings-lbl">Supabase Anon Key</span>
-        <input class="settings-input" id="supabase-key-inp" type="password" placeholder="public-anon-key">
+        <input class="settings-input" id="supabase-key-inp" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bHZiaXRhY3ZlbWdrbmRtZmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTM0NjcsImV4cCI6MjA5NDc2OTQ2N30.diLEK6xnzQj1hBH6G2NFq0uTuC8xJHlHX6hkwYfwAqQ">
       </div>
       <div class="settings-field">
         <span class="settings-lbl">Profile Identifier</span>
         <input class="settings-input" id="user-id-inp" type="text" placeholder="Generated automatically if empty">
+      </div>
+      <div class="settings-field">
+        <span class="settings-lbl">Team Space ID</span>
+        <input class="settings-input" id="team-id-inp" type="text" placeholder="e.g. Design-Team-A">
       </div>
       
       <button class="save-btn" id="save-btn">Save settings</button>
