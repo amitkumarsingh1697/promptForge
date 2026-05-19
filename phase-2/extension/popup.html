@@ -189,6 +189,21 @@
       </div>
     </div>
 
+    <!-- Category 4: Design Tokens Ingestion -->
+    <div class="options-block mt-10">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <span class="opt-label" style="margin-bottom: 0;">Design Tokens</span>
+        <button class="preset-save-link" id="token-upload-link" title="Upload tokens.json or custom CSS file">+ Load tokens</button>
+      </div>
+      <input type="file" id="token-file-input" accept=".json,.css" class="hidden" style="display: none;">
+      <div class="token-status-row hidden" id="token-status-row">
+        <span class="token-status-badge" id="token-status-name">my-tokens.json</span>
+        <span class="token-status-details" id="token-status-details">0 tokens loaded</span>
+        <button class="token-clear-btn" id="token-clear-btn" title="Remove custom design tokens">✕</button>
+      </div>
+      <div id="token-empty-msg" class="empty-presets">No custom design tokens loaded. Prompts will use standard scales.</div>
+    </div>
+
     <button class="gen-btn" id="gen-btn">
       <div class="spinner" id="spinner"></div>
       <svg id="btn-icon" width="15" height="15" viewBox="0 0 18 18" fill="none">

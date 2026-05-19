@@ -8,6 +8,7 @@ let lastPrompt = '';
 let activeAgent = 'claude';
 let apiKeys = { claude: '', gemini: '', openai: '', deepseek: '', groq: '', mistral: '' };
 let workspacePresets = [];
+let loadedDesignTokens = null;
 
 function init() {
   setupTabs();
@@ -21,6 +22,7 @@ function init() {
   setupBottomBar();
   setupAgentSelect();
   setupPresets();
+  setupDesignTokens();
 }
 
 function setupTabs() {
@@ -526,11 +528,17 @@ function buildInstruction(fw, st, colors, font, desc, urlVal) {
       ? `[See attached UI screenshot — analyze and recreate it exactly]`
       : `Input description: "${desc}"`;
 
+  let tokenInstructions = '';
+  if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
+    const list = loadedDesignTokens.tokens.map(t => `- ${t.name}: ${t.value}`).join('\n');
+    tokenInstructions = `\n\nStrictly adhere to the following project-specific design system tokens and style variables:\n${list}`;
+  }
+
   return `You are an expert UI/UX prompt engineer. Transform the following into the most precise, optimized prompt for building an exact UI.
 
 ${inputLine}
 Target framework: ${fw}
-Style direction: ${st}${colors ? `\nColor palette: ${colors}` : ''}${font ? `\nFont family: ${font}` : ''}
+Style direction: ${st}${colors ? `\nColor palette: ${colors}` : ''}${font ? `\nFont family: ${font}` : ''}${tokenInstructions}
 
 Write a hyper-detailed, engineer-ready prompt covering:
 - Exact layout structure and grid system
@@ -981,6 +989,135 @@ function sendTelemetry(satisfaction) {
     })
     .then(data => console.log('Proxy telemetry ingestion success:', data))
     .catch(err => console.warn('Proxy telemetry ingestion offline/failed:', err));
+  }
+}
+
+// Category 4: Design Token Constraints Ingestion
+function setupDesignTokens() {
+  const uploadLink = document.getElementById('token-upload-link');
+  const fileInput = document.getElementById('token-file-input');
+  const clearBtn = document.getElementById('token-clear-btn');
+
+  if (uploadLink && fileInput) {
+    uploadLink.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = evt.target.result;
+        let tokens = [];
+        try {
+          if (file.name.endsWith('.json')) {
+            const json = JSON.parse(text);
+            tokens = parseJsonTokens(json);
+          } else if (file.name.endsWith('.css')) {
+            tokens = parseCssTokens(text);
+          } else {
+            alert('Unsupported file format. Please upload a .json or .css design token file.');
+            return;
+          }
+
+          if (tokens.length === 0) {
+            alert('No valid design tokens found in the file.');
+            return;
+          }
+
+          loadedDesignTokens = {
+            filename: file.name,
+            tokens: tokens
+          };
+
+          saveDesignTokensToStorage();
+          renderDesignTokensState();
+        } catch (err) {
+          alert('Error parsing design token file: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      loadedDesignTokens = null;
+      saveDesignTokensToStorage();
+      renderDesignTokensState();
+      if (fileInput) fileInput.value = '';
+    });
+  }
+
+  // Load from local storage
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(['loadedDesignTokens'], (result) => {
+      if (result.loadedDesignTokens) {
+        loadedDesignTokens = result.loadedDesignTokens;
+        renderDesignTokensState();
+      }
+    });
+  }
+}
+
+function parseJsonTokens(obj, prefix = '') {
+  let tokens = [];
+  for (let key in obj) {
+    if (!obj.hasOwnProperty(key)) continue;
+    const val = obj[key];
+    const newPrefix = prefix ? `${prefix}.${key}` : key;
+    if (val !== null && typeof val === 'object') {
+      if (val.hasOwnProperty('value') && (typeof val.value === 'string' || typeof val.value === 'number')) {
+        tokens.push({ name: newPrefix, value: val.value });
+      } else {
+        tokens = tokens.concat(parseJsonTokens(val, newPrefix));
+      }
+    } else if (typeof val === 'string' || typeof val === 'number') {
+      tokens.push({ name: newPrefix, value: val });
+    }
+  }
+  return tokens;
+}
+
+function parseCssTokens(cssText) {
+  const tokens = [];
+  const regex = /--([a-zA-Z0-9_-]+)\s*:\s*([^;]+)/g;
+  let match;
+  while ((match = regex.exec(cssText)) !== null) {
+    tokens.push({
+      name: `--${match[1].trim()}`,
+      value: match[2].trim()
+    });
+  }
+  return tokens;
+}
+
+function saveDesignTokensToStorage() {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.set({ loadedDesignTokens }, () => {
+      console.log('Design tokens saved to local storage');
+    });
+  }
+}
+
+function renderDesignTokensState() {
+  const row = document.getElementById('token-status-row');
+  const emptyMsg = document.getElementById('token-empty-msg');
+  const nameSpan = document.getElementById('token-status-name');
+  const detailsSpan = document.getElementById('token-status-details');
+
+  if (!row || !emptyMsg) return;
+
+  if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
+    nameSpan.textContent = loadedDesignTokens.filename;
+    detailsSpan.textContent = `${loadedDesignTokens.tokens.length} design tokens loaded`;
+    row.classList.remove('hidden');
+    emptyMsg.classList.add('hidden');
+  } else {
+    row.classList.add('hidden');
+    emptyMsg.classList.remove('hidden');
   }
 }
 
