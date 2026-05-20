@@ -315,6 +315,46 @@
         <input class="settings-input" type="password" id="api-key-inp" placeholder="Enter API key for selected agent">
       </div>
       
+      <!-- Account Profile & Subscription (Category A) -->
+      <div class="settings-field mt-10" style="border-top: 1px solid var(--border); padding-top: 10px;">
+        <span class="settings-lbl">Identity & Subscription</span>
+        
+        <!-- Logged out state -->
+        <div id="account-logged-out" class="account-card" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-top: 4px; display: block; width: 100%;">
+          <span style="font-size: 10.5px; color: var(--text-dim); margin-bottom: 8px; display: block; font-style: italic;">Sign in to sync presets and track usage quota.</span>
+          <div style="display: flex; gap: 6px;">
+            <button class="mode-toggle" id="btn-login-google" style="flex: 1; padding: 4px; font-size: 10px;">Google Login</button>
+            <button class="mode-toggle" id="btn-login-github" style="flex: 1; padding: 4px; font-size: 10px;">GitHub Login</button>
+          </div>
+        </div>
+
+        <!-- Logged in state -->
+        <div id="account-logged-in" class="account-card hidden" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-top: 4px; width: 100%;">
+          <div class="user-info-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <img class="user-avatar" id="user-avatar" src="" style="width: 20px; height: 20px; border-radius: 50%; display: none;">
+            <div style="flex: 1;">
+              <div class="user-email" id="user-email" style="font-size: 11px; font-weight: 600; color: white;">user@promptforge.dev</div>
+              <div class="user-tier-badge" id="user-tier" style="font-size: 9.5px; color: var(--accent); font-weight: 700; text-transform: uppercase; margin-top: 1px;">Free Tier</div>
+            </div>
+            <button class="token-clear-btn" id="btn-logout" title="Sign out" style="font-size: 10px; padding: 2px 6px;">Sign Out</button>
+          </div>
+
+          <!-- Usage limit bar -->
+          <div class="quota-container" id="quota-container" style="margin-bottom: 4px; margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">
+              <span>Generations limit</span>
+              <span id="quota-label">0 / 10 runs</span>
+            </div>
+            <div class="quota-bar-bg" style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+              <div class="quota-bar-fill" id="quota-fill" style="width: 0%; height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s;"></div>
+            </div>
+          </div>
+
+          <!-- Checkout upgrade paywall -->
+          <button class="save-btn" id="btn-upgrade-stripe" style="width: 100%; margin-top: 8px; padding: 5px; background: linear-gradient(135deg, #7c6afa 0%, #a78bfa 100%); border: none; font-size: 10.5px;">⚡ Upgrade to Pro</button>
+        </div>
+      </div>
+      
       <div id="dev-fields" class="hidden">
         <div class="settings-field">
           <span class="settings-lbl">Mode</span>

@@ -587,6 +587,49 @@
       color: #F87171;
       border: 1px solid rgba(248, 113, 113, 0.2);
     }
+
+    /* SaaS Onboarding & Quota indicator styles */
+    .account-card {
+      box-sizing: border-box;
+      border-radius: 6px;
+      padding: 6px 10px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      margin-top: 4px;
+      width: 100%;
+    }
+    
+    #btn-upgrade-stripe {
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 12px rgba(124, 106, 250, 0.3);
+      animation: glow-pulse 2s infinite alternate;
+    }
+    
+    #btn-upgrade-stripe:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 20px rgba(124, 106, 250, 0.6);
+    }
+    
+    @keyframes glow-pulse {
+      0% { box-shadow: 0 0 8px rgba(124, 106, 250, 0.2); }
+      100% { box-shadow: 0 0 16px rgba(124, 106, 250, 0.5); }
+    }
+    
+    .quota-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+    .quota-bar-fill.warning {
+      background: #F59E0B !important;
+    }
+    .quota-bar-fill.danger {
+      background: #EF4444 !important;
+    }
   </style>
 </head>
 <body>
@@ -626,6 +669,46 @@
       <span class="opt-label">Team Space ID</span>
       <input type="text" id="team-id" placeholder="e.g. Design-Team-A">
     </div>
+    <!-- Account Profile & Subscription (Category A) -->
+    <div class="field-row" style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px;">
+      <span class="opt-label">Identity & Subscription</span>
+      
+      <!-- Logged out state -->
+      <div id="account-logged-out" class="account-card" style="display: block;">
+        <span style="font-size: 10.5px; color: var(--text-dim); margin-bottom: 6px; display: block; font-style: italic;">Sign in to sync presets and track usage quota.</span>
+        <div style="display: flex; gap: 6px;">
+          <button class="mode-toggle" id="btn-login-google" style="flex: 1; padding: 4px; font-size: 10px; border: 1px solid var(--border); background: transparent; color: white; cursor: pointer; border-radius: 4px;">Google Login</button>
+          <button class="mode-toggle" id="btn-login-github" style="flex: 1; padding: 4px; font-size: 10px; border: 1px solid var(--border); background: transparent; color: white; cursor: pointer; border-radius: 4px;">GitHub Login</button>
+        </div>
+      </div>
+
+      <!-- Logged in state -->
+      <div id="account-logged-in" class="account-card hidden">
+        <div class="user-info-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <img class="user-avatar" id="user-avatar" src="" style="width: 20px; height: 20px; border-radius: 50%; display: none;">
+          <div style="flex: 1;">
+            <div class="user-email" id="user-email" style="font-size: 11px; font-weight: 600; color: white;">user@promptforge.dev</div>
+            <div class="user-tier-badge" id="user-tier" style="font-size: 9.5px; color: var(--accent); font-weight: 700; text-transform: uppercase; margin-top: 1px;">Free Tier</div>
+          </div>
+          <button class="token-clear-btn" id="btn-logout" title="Sign out" style="font-size: 10px; padding: 2px 6px;">Sign Out</button>
+        </div>
+
+        <!-- Usage limit bar -->
+        <div class="quota-container" id="quota-container" style="margin-bottom: 4px; margin-top: 6px; width: 100%;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">
+            <span>Generations limit</span>
+            <span id="quota-label">0 / 10 runs</span>
+          </div>
+          <div class="quota-bar-bg" style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+            <div class="quota-bar-fill" id="quota-fill"></div>
+          </div>
+        </div>
+
+        <!-- Checkout upgrade paywall -->
+        <button class="gen-btn" id="btn-upgrade-stripe" style="width: 100%; margin-top: 6px; padding: 4px; background: linear-gradient(135deg, #7c6afa 0%, #a78bfa 100%); border: none; font-size: 10.5px; cursor: pointer; color: white; border-radius: 4px;">Upgrade to Pro</button>
+      </div>
+    </div>
+
     <button class="gen-btn" id="settings-save-btn" style="padding: 6px; font-size: 11.5px;">Save configurations</button>
   </div>
 
@@ -764,8 +847,14 @@
     let userId = '';
     let teamId = '';
 
+    let isLoggedIn = false;
+    let accountTier = 'free';
+    let generationsCount = 0;
+    let userEmail = '';
+
     // Load initial settings on boot
     loadSettings();
+    setupMonetization();
 
     function loadSettings() {
       geminiKey = localStorage.getItem('figmaGeminiKey') || '';
@@ -774,6 +863,11 @@
       supabaseKey = localStorage.getItem('figmaSupabaseKey') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bHZiaXRhY3ZlbWdrbmRtZmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTM0NjcsImV4cCI6MjA5NDc2OTQ2N30.diLEK6xnzQj1hBH6G2NFq0uTuC8xJHlHX6hkwYfwAqQ';
       userId = localStorage.getItem('figmaUserId') || '';
       teamId = localStorage.getItem('figmaTeamId') || '';
+
+      isLoggedIn = localStorage.getItem('figmaIsLoggedIn') === 'true';
+      accountTier = localStorage.getItem('figmaAccountTier') || 'free';
+      generationsCount = parseInt(localStorage.getItem('figmaGenerationsCount') || '0', 10);
+      userEmail = localStorage.getItem('figmaUserEmail') || '';
 
       if (!userId) {
         userId = 'pf-figma-' + Math.random().toString(36).substring(2, 15);
@@ -868,6 +962,18 @@
 
     // Spec compilation prompt builder
     document.getElementById('generate-btn').addEventListener('click', async () => {
+      if (accountTier === 'free' && generationsCount >= 10) {
+        alert('Free quota limit reached (10/10 runs). Please Upgrade to Pro in Settings.');
+        document.getElementById('settings-drawer').classList.remove('hidden');
+        return;
+      }
+
+      if (!geminiKey && !isLoggedIn) {
+        alert('Please enter your Gemini API key or Sign In in Settings first.');
+        document.getElementById('settings-drawer').classList.remove('hidden');
+        return;
+      }
+
       if (!activeNodeData) {
         alert('Please scan a selected Figma element layer first.');
         return;
@@ -937,6 +1043,13 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
 
         document.getElementById('output-wrap').classList.add('visible');
         logPromptToHistory(lastPrompt);
+
+        // Increment quota
+        if (isLoggedIn) {
+          generationsCount++;
+          saveMonetizationToStorage();
+          updateQuotaUI();
+        }
       } catch (err) {
         alert('Prompt generation failed: ' + err.message);
       } finally {
@@ -1756,6 +1869,176 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
         .then(data => console.log('[Figma Telemetry] success:', data))
         .catch(e => console.warn('[Figma Telemetry] offline:', e.message));
       }
+    }
+
+    // Category A: Onboarding & Stripe Paywall Controllers inside Figma Plugin
+    function setupMonetization() {
+      const loginGoogle = document.getElementById('btn-login-google');
+      const loginGithub = document.getElementById('btn-login-github');
+      const logoutBtn = document.getElementById('btn-logout');
+      const upgradeBtn = document.getElementById('btn-upgrade-stripe');
+
+      if (loginGoogle) {
+        loginGoogle.addEventListener('click', () => handleOAuthLogin('google'));
+      }
+      if (loginGithub) {
+        loginGithub.addEventListener('click', () => handleOAuthLogin('github'));
+      }
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+      }
+      if (upgradeBtn) {
+        upgradeBtn.addEventListener('click', handleUpgradeStripe);
+      }
+
+      updateQuotaUI();
+    }
+
+    function saveMonetizationToStorage() {
+      localStorage.setItem('figmaIsLoggedIn', isLoggedIn);
+      localStorage.setItem('figmaAccountTier', accountTier);
+      localStorage.setItem('figmaGenerationsCount', generationsCount);
+      localStorage.setItem('figmaUserEmail', userEmail);
+    }
+
+    function updateQuotaUI() {
+      const loggedOut = document.getElementById('account-logged-out');
+      const loggedIn = document.getElementById('account-logged-in');
+      
+      if (!loggedOut || !loggedIn) return;
+
+      if (isLoggedIn) {
+        loggedOut.classList.add('hidden');
+        loggedIn.classList.remove('hidden');
+
+        document.getElementById('user-email').textContent = userEmail;
+        document.getElementById('user-tier').textContent = accountTier + ' Tier';
+        
+        const avatar = document.getElementById('user-avatar');
+        if (avatar) {
+          avatar.src = `https://api.dicebear.com/7.x/bottts/svg?seed=${userEmail}`;
+          avatar.style.display = 'block';
+        }
+
+        const quotaLabel = document.getElementById('quota-label');
+        const quotaFill = document.getElementById('quota-fill');
+        
+        if (accountTier === 'pro') {
+          quotaLabel.textContent = 'Unlimited runs';
+          quotaFill.style.width = '100%';
+          quotaFill.className = 'quota-bar-fill';
+          document.getElementById('btn-upgrade-stripe').style.display = 'none';
+          document.getElementById('user-tier').style.color = '#34D399';
+        } else {
+          quotaLabel.textContent = `${generationsCount} / 10 runs`;
+          const pct = Math.min((generationsCount / 10) * 100, 100);
+          quotaFill.style.width = `${pct}%`;
+          
+          quotaFill.className = 'quota-bar-fill';
+          if (generationsCount >= 9) {
+            quotaFill.classList.add('danger');
+          } else if (generationsCount >= 6) {
+            quotaFill.classList.add('warning');
+          }
+
+          document.getElementById('btn-upgrade-stripe').style.display = 'block';
+          document.getElementById('user-tier').style.color = 'var(--accent)';
+        }
+
+        const genBtn = document.getElementById('generate-btn');
+        if (genBtn) {
+          if (accountTier === 'free' && generationsCount >= 10) {
+            genBtn.disabled = true;
+            genBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+            genBtn.style.color = '#EF4444';
+            genBtn.textContent = 'Quota Exceeded - Upgrade to Pro';
+          } else {
+            genBtn.disabled = false;
+            genBtn.style.background = '';
+            genBtn.style.color = '';
+            if (genBtn.textContent.includes('Quota')) {
+              genBtn.textContent = 'Generate specs prompt';
+            }
+          }
+        }
+      } else {
+        loggedOut.classList.remove('hidden');
+        loggedIn.classList.add('hidden');
+        
+        const genBtn = document.getElementById('generate-btn');
+        if (genBtn) {
+          genBtn.disabled = false;
+          genBtn.style.background = '';
+          genBtn.style.color = '';
+          if (genBtn.textContent.includes('Quota')) {
+            genBtn.textContent = 'Generate specs prompt';
+          }
+        }
+      }
+    }
+
+    function handleOAuthLogin(provider) {
+      console.log(`Simulating figma ${provider} OAuth authentication...`);
+      isLoggedIn = true;
+      accountTier = 'free';
+      generationsCount = 3;
+      userEmail = provider === 'google' ? 'amit.singh@google.com' : 'amitkmrsingh1697@github';
+      
+      saveMonetizationToStorage();
+      updateQuotaUI();
+      
+      const msg = document.createElement('div');
+      msg.style.position = 'absolute';
+      msg.style.top = '10px';
+      msg.style.left = '50%';
+      msg.style.transform = 'translateX(-50%)';
+      msg.style.background = 'var(--green)';
+      msg.style.color = '#000';
+      msg.style.padding = '4px 12px';
+      msg.style.borderRadius = '20px';
+      msg.style.fontSize = '11px';
+      msg.style.fontWeight = '600';
+      msg.style.zIndex = '10000';
+      msg.textContent = `Signed in via ${provider}!`;
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 1500);
+    }
+
+    function handleLogout() {
+      isLoggedIn = false;
+      accountTier = 'free';
+      generationsCount = 0;
+      userEmail = '';
+      saveMonetizationToStorage();
+      updateQuotaUI();
+    }
+
+    function handleUpgradeStripe() {
+      console.log('Initiating figma mock Stripe checkout session...');
+      const upgradeBtn = document.getElementById('btn-upgrade-stripe');
+      upgradeBtn.textContent = 'Connecting Stripe...';
+      
+      setTimeout(() => {
+        accountTier = 'pro';
+        saveMonetizationToStorage();
+        updateQuotaUI();
+        
+        const msg = document.createElement('div');
+        msg.style.position = 'absolute';
+        msg.style.top = '10px';
+        msg.style.left = '50%';
+        msg.style.transform = 'translateX(-50%)';
+        msg.style.background = '#34D399';
+        msg.style.color = '#000';
+        msg.style.padding = '5px 14px';
+        msg.style.borderRadius = '20px';
+        msg.style.fontSize = '11.5px';
+        msg.style.fontWeight = '700';
+        msg.style.zIndex = '10000';
+        msg.textContent = '⚡ Upgraded to PRO successfully!';
+        document.body.appendChild(msg);
+        setTimeout(() => msg.remove(), 2500);
+      }, 1000);
     }
   </script>
 </body>

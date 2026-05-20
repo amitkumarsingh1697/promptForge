@@ -15,6 +15,10 @@ let supabaseUrl = 'https://ywlvbitacvemgkndmfef.supabase.co';
 let supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bHZiaXRhY3ZlbWdrbmRtZmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTM0NjcsImV4cCI6MjA5NDc2OTQ2N30.diLEK6xnzQj1hBH6G2NFq0uTuC8xJHlHX6hkwYfwAqQ';
 let userId = '';
 let teamId = '';
+let isLoggedIn = false;
+let accountTier = 'free';
+let generationsCount = 0;
+let userEmail = '';
 
 function init() {
   setupTabs();
@@ -30,6 +34,7 @@ function init() {
   setupPresets();
   setupDesignTokens();
   setupHistory();
+  setupMonetization();
 }
 
 function setupTabs() {
@@ -310,7 +315,23 @@ async function generate() {
   if (currentTab === 'text' && !desc) { showError('Please describe the UI you want to build.'); return; }
   if (currentTab === 'image' && !imgData) { showError('Please upload a UI screenshot first.'); return; }
   if (currentTab === 'url' && !urlVal) { showError('Please paste a URL.'); return; }
-  if (!apiKey) { document.getElementById('settings-panel').classList.add('open'); showError('Add your API key in Settings first.'); return; }
+  if (accountTier === 'free' && generationsCount >= 10) {
+    document.getElementById('settings-panel').classList.add('open');
+    showError('Free quota limit reached (10/10 runs). Please Upgrade to Pro.');
+    return;
+  }
+
+  if (mode === 'direct' && !apiKey) {
+    document.getElementById('settings-panel').classList.add('open');
+    showError('Direct API mode requires an API Key in Settings.');
+    return;
+  }
+
+  if (!apiKey && !isLoggedIn) {
+    document.getElementById('settings-panel').classList.add('open');
+    showError('Add your API key or Sign In in Settings first.');
+    return;
+  }
 
   setLoading(true);
   document.getElementById('output-wrap').classList.remove('visible');
@@ -548,6 +569,13 @@ async function generate() {
       console.log('Raw string was:', raw);
       // Fallback to raw text if no JSON found
       renderOutput({ prompt: raw, accuracy: "~90%", layout: "Unknown", components: "Unknown", tokens: "Medium" });
+    }
+
+    // Increment SaaS freemium counter
+    if (isLoggedIn) {
+      generationsCount++;
+      saveMonetizationToStorage();
+      updateQuotaUI();
     }
   } catch (e) {
     showError('Error: ' + (e.message || 'Check your API key and try again.'));
@@ -1665,6 +1693,207 @@ async function clearAllHistoryFromCloud() {
   } catch (e) {
     console.warn('Supabase clear history error:', e.message);
   }
+}
+
+// Category A: Onboarding & Stripe Paywall Controllers
+function setupMonetization() {
+  const loginGoogle = document.getElementById('btn-login-google');
+  const loginGithub = document.getElementById('btn-login-github');
+  const logoutBtn = document.getElementById('btn-logout');
+  const upgradeBtn = document.getElementById('btn-upgrade-stripe');
+
+  if (loginGoogle) {
+    loginGoogle.addEventListener('click', () => handleOAuthLogin('google'));
+  }
+  if (loginGithub) {
+    loginGithub.addEventListener('click', () => handleOAuthLogin('github'));
+  }
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', handleLogout);
+  }
+  if (upgradeBtn) {
+    upgradeBtn.addEventListener('click', handleUpgradeStripe);
+  }
+
+  // Load state from chrome storage
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(['isLoggedIn', 'accountTier', 'generationsCount', 'userEmail'], (result) => {
+      if (result.hasOwnProperty('isLoggedIn')) isLoggedIn = result.isLoggedIn;
+      if (result.accountTier) accountTier = result.accountTier;
+      if (result.hasOwnProperty('generationsCount')) generationsCount = result.generationsCount;
+      if (result.userEmail) userEmail = result.userEmail;
+      
+      updateQuotaUI();
+    });
+  } else {
+    // Fallback load
+    isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    accountTier = localStorage.getItem('accountTier') || 'free';
+    generationsCount = parseInt(localStorage.getItem('generationsCount') || '0', 10);
+    userEmail = localStorage.getItem('userEmail') || '';
+    updateQuotaUI();
+  }
+}
+
+function saveMonetizationToStorage() {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.set({ isLoggedIn, accountTier, generationsCount, userEmail });
+  } else {
+    localStorage.setItem('isLoggedIn', isLoggedIn);
+    localStorage.setItem('accountTier', accountTier);
+    localStorage.setItem('generationsCount', generationsCount);
+    localStorage.setItem('userEmail', userEmail);
+  }
+}
+
+function updateQuotaUI() {
+  const loggedOut = document.getElementById('account-logged-out');
+  const loggedIn = document.getElementById('account-logged-in');
+  
+  if (!loggedOut || !loggedIn) return;
+
+  if (isLoggedIn) {
+    loggedOut.classList.add('hidden');
+    loggedIn.classList.remove('hidden');
+
+    document.getElementById('user-email').textContent = userEmail;
+    document.getElementById('user-tier').textContent = accountTier + ' Tier';
+    
+    // Set avatar if present or show initials
+    const avatar = document.getElementById('user-avatar');
+    if (avatar) {
+      avatar.src = `https://api.dicebear.com/7.x/bottts/svg?seed=${userEmail}`;
+      avatar.style.display = 'block';
+    }
+
+    // Update quota indicator
+    const quotaLabel = document.getElementById('quota-label');
+    const quotaFill = document.getElementById('quota-fill');
+    
+    if (accountTier === 'pro') {
+      quotaLabel.textContent = 'Unlimited runs';
+      quotaFill.style.width = '100%';
+      quotaFill.className = 'quota-bar-fill'; // Clear warning states
+      document.getElementById('btn-upgrade-stripe').style.display = 'none';
+      document.getElementById('user-tier').style.color = '#34D399'; // Green Pro color
+    } else {
+      quotaLabel.textContent = `${generationsCount} / 10 runs`;
+      const pct = Math.min((generationsCount / 10) * 100, 100);
+      quotaFill.style.width = `${pct}%`;
+      
+      // Dynamic colors based on usage severity
+      quotaFill.className = 'quota-bar-fill';
+      if (generationsCount >= 9) {
+        quotaFill.classList.add('danger');
+      } else if (generationsCount >= 6) {
+        quotaFill.classList.add('warning');
+      }
+
+      document.getElementById('btn-upgrade-stripe').style.display = 'block';
+      document.getElementById('user-tier').style.color = 'var(--accent)';
+    }
+
+    // Enforce CTA disable/enable
+    const genBtn = document.getElementById('gen-btn');
+    if (genBtn) {
+      if (accountTier === 'free' && generationsCount >= 10) {
+        genBtn.disabled = true;
+        const txt = genBtn.querySelector('#btn-txt') || genBtn;
+        txt.textContent = 'Quota Exceeded - Upgrade to Pro';
+        genBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+        genBtn.style.color = '#EF4444';
+      } else {
+        genBtn.disabled = false;
+        const txt = genBtn.querySelector('#btn-txt') || genBtn;
+        if (txt.textContent.includes('Quota')) {
+          txt.textContent = 'Generate optimized prompt';
+        }
+        genBtn.style.background = '';
+        genBtn.style.color = '';
+      }
+    }
+  } else {
+    loggedOut.classList.remove('hidden');
+    loggedIn.classList.add('hidden');
+    
+    // Enable button by default if logged out (falls back to local API key requirement)
+    const genBtn = document.getElementById('gen-btn');
+    if (genBtn) {
+      genBtn.disabled = false;
+      const txt = genBtn.querySelector('#btn-txt') || genBtn;
+      if (txt.textContent.includes('Quota')) {
+        txt.textContent = 'Generate optimized prompt';
+      }
+      genBtn.style.background = '';
+      genBtn.style.color = '';
+    }
+  }
+}
+
+function handleOAuthLogin(provider) {
+  console.log(`Simulating ${provider} OAuth authentication...`);
+  isLoggedIn = true;
+  accountTier = 'free';
+  generationsCount = 2; // Pre-populate some mock runs
+  userEmail = provider === 'google' ? 'amit.singh@google.com' : 'amitkmrsingh1697@github';
+  
+  saveMonetizationToStorage();
+  updateQuotaUI();
+  
+  const msg = document.createElement('div');
+  msg.style.position = 'absolute';
+  msg.style.top = '10px';
+  msg.style.left = '50%';
+  msg.style.transform = 'translateX(-50%)';
+  msg.style.background = 'var(--green)';
+  msg.style.color = '#000';
+  msg.style.padding = '4px 12px';
+  msg.style.borderRadius = '20px';
+  msg.style.fontSize = '11px';
+  msg.style.fontWeight = '600';
+  msg.style.zIndex = '10000';
+  msg.textContent = `Signed in via ${provider}!`;
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 1500);
+}
+
+function handleLogout() {
+  isLoggedIn = false;
+  accountTier = 'free';
+  generationsCount = 0;
+  userEmail = '';
+  saveMonetizationToStorage();
+  updateQuotaUI();
+}
+
+function handleUpgradeStripe() {
+  console.log('Initiating mock Stripe checkout session redirect...');
+  const upgradeBtn = document.getElementById('btn-upgrade-stripe');
+  upgradeBtn.textContent = 'Connecting Stripe...';
+  
+  setTimeout(() => {
+    // Simulating successful Stripe subscription callback
+    accountTier = 'pro';
+    saveMonetizationToStorage();
+    updateQuotaUI();
+    
+    // Display premium billing upgrade success message
+    const msg = document.createElement('div');
+    msg.style.position = 'absolute';
+    msg.style.top = '10px';
+    msg.style.left = '50%';
+    msg.style.transform = 'translateX(-50%)';
+    msg.style.background = '#34D399';
+    msg.style.color = '#000';
+    msg.style.padding = '5px 14px';
+    msg.style.borderRadius = '20px';
+    msg.style.fontSize = '11.5px';
+    msg.style.fontWeight = '700';
+    msg.style.zIndex = '10000';
+    msg.textContent = '⚡ Upgraded to PRO successfully!';
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 2500);
+  }, 1000);
 }
 
 document.addEventListener('DOMContentLoaded', init);
