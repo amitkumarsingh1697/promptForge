@@ -750,17 +750,12 @@
 
   <!-- Category 4: Design Tokens Ingestion -->
   <div class="options-block mt-10">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-      <span class="opt-label" style="margin-bottom: 0;">Design Tokens</span>
-      <button class="preset-save-link" id="token-upload-link" title="Upload tokens.json or custom CSS file">+ Load tokens</button>
+    <span class="opt-label">Design Tokens</span>
+    <textarea id="token-text-input" placeholder="Paste tokens.json or custom CSS variables (e.g. --color: #fff;) here..." style="width: 100%; height: 55px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 6px; color: white; padding: 6px 8px; font-size: 11px; font-family: monospace; resize: vertical; margin-top: 4px; outline: none;"></textarea>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+      <span id="token-status-lbl" style="font-size: 10.5px; color: var(--text-dim); font-style: italic;">No design tokens parsed</span>
+      <button class="token-clear-btn" id="token-clear-btn" title="Clear design tokens" style="font-size: 10px; padding: 2px 6px; background: rgba(255,255,255,0.05); border: none; color: var(--text-muted); cursor: pointer; border-radius: 4px;">Clear</button>
     </div>
-    <input type="file" id="token-file-input" accept=".json,.css" class="hidden" style="display: none;">
-    <div class="token-status-row hidden" id="token-status-row">
-      <span class="token-status-badge" id="token-status-name">my-tokens.json</span>
-      <span class="token-status-details" id="token-status-details">0 tokens loaded</span>
-      <button class="token-clear-btn" id="token-clear-btn" title="Remove custom design tokens">✕</button>
-    </div>
-    <div id="token-empty-msg" class="empty-presets" style="font-size: 11px; color: var(--text-dim); font-style: italic;">No custom design tokens loaded. Prompts will use standard scales.</div>
   </div>
 
   <!-- Workspace configurations pills -->
@@ -1131,6 +1126,7 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
     // Figma Plugin Workspace Presets Engine
     let workspacePresets = [];
     let loadedDesignTokens = null;
+    let rawTokensText = '';
 
     setupPresets();
     setupDesignTokens();
@@ -1357,71 +1353,71 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
 
     // Category 4: Design Token Ingest
     function setupDesignTokens() {
-      const uploadLink = document.getElementById('token-upload-link');
-      const fileInput = document.getElementById('token-file-input');
+      const textInput = document.getElementById('token-text-input');
       const clearBtn = document.getElementById('token-clear-btn');
 
-      if (uploadLink && fileInput) {
-        uploadLink.addEventListener('click', () => {
-          fileInput.click();
-        });
-
-        fileInput.addEventListener('change', (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            const text = evt.target.result;
-            let tokens = [];
-            try {
-              if (file.name.endsWith('.json')) {
-                const json = JSON.parse(text);
-                tokens = parseJsonTokens(json);
-              } else if (file.name.endsWith('.css')) {
-                tokens = parseCssTokens(text);
-              } else {
-                alert('Unsupported file format. Please upload a .json or .css design token file.');
-                return;
-              }
-
-              if (tokens.length === 0) {
-                alert('No valid design tokens found in the file.');
-                return;
-              }
-
-              loadedDesignTokens = {
-                filename: file.name,
-                tokens: tokens
-              };
-
-              saveDesignTokensToStorage();
-              renderDesignTokensState();
-            } catch (err) {
-              alert('Error parsing design token file: ' + err.message);
-            }
-          };
-          reader.readAsText(file);
+      if (textInput) {
+        textInput.addEventListener('input', () => {
+          rawTokensText = textInput.value;
+          processRawTokensText();
         });
       }
 
       if (clearBtn) {
         clearBtn.addEventListener('click', () => {
+          rawTokensText = '';
+          if (textInput) textInput.value = '';
           loadedDesignTokens = null;
           saveDesignTokensToStorage();
           renderDesignTokensState();
-          if (fileInput) fileInput.value = '';
         });
       }
 
       // Load cached tokens
+      rawTokensText = localStorage.getItem('figmaRawTokensText') || '';
       const cached = localStorage.getItem('figmaLoadedDesignTokens');
       if (cached) {
         try {
           loadedDesignTokens = JSON.parse(cached);
-          renderDesignTokensState();
         } catch (e) {}
       }
+
+      if (textInput && rawTokensText) {
+        textInput.value = rawTokensText;
+        processRawTokensText();
+      } else {
+        renderDesignTokensState();
+      }
+    }
+
+    function processRawTokensText() {
+      let tokens = [];
+      const text = rawTokensText.trim();
+      if (!text) {
+        loadedDesignTokens = null;
+        saveDesignTokensToStorage();
+        renderDesignTokensState();
+        return;
+      }
+
+      try {
+        if (text.startsWith('{')) {
+          const json = JSON.parse(text);
+          tokens = parseJsonTokens(json);
+        } else {
+          tokens = parseCssTokens(text);
+        }
+
+        loadedDesignTokens = {
+          filename: 'Pasted Tokens',
+          tokens: tokens
+        };
+      } catch (e) {
+        loadedDesignTokens = null;
+      }
+
+      saveDesignTokensToStorage();
+      renderDesignTokensState();
     }
 
     function parseJsonTokens(obj, prefix = '') {
@@ -1457,25 +1453,20 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
     }
 
     function saveDesignTokensToStorage() {
+      localStorage.setItem('figmaRawTokensText', rawTokensText);
       localStorage.setItem('figmaLoadedDesignTokens', JSON.stringify(loadedDesignTokens));
     }
 
     function renderDesignTokensState() {
-      const row = document.getElementById('token-status-row');
-      const emptyMsg = document.getElementById('token-empty-msg');
-      const nameSpan = document.getElementById('token-status-name');
-      const detailsSpan = document.getElementById('token-status-details');
-
-      if (!row || !emptyMsg) return;
+      const statusLbl = document.getElementById('token-status-lbl');
+      if (!statusLbl) return;
 
       if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
-        if (nameSpan) nameSpan.textContent = loadedDesignTokens.filename;
-        if (detailsSpan) detailsSpan.textContent = `${loadedDesignTokens.tokens.length} design tokens loaded`;
-        row.classList.remove('hidden');
-        emptyMsg.classList.add('hidden');
+        statusLbl.textContent = `${loadedDesignTokens.tokens.length} design tokens parsed`;
+        statusLbl.style.color = '#34D399';
       } else {
-        row.classList.add('hidden');
-        emptyMsg.classList.remove('hidden');
+        statusLbl.textContent = 'No design tokens parsed';
+        statusLbl.style.color = '';
       }
     }
 

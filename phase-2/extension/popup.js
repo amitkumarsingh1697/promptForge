@@ -10,6 +10,7 @@ let activeAgent = 'claude';
 let apiKeys = { claude: '', gemini: '', openai: '', deepseek: '', groq: '', mistral: '' };
 let workspacePresets = [];
 let loadedDesignTokens = null;
+let rawTokensText = '';
 let activeTabVariables = null;
 let historyLog = [];
 let supabaseUrl = 'https://ywlvbitacvemgkndmfef.supabase.co';
@@ -24,7 +25,7 @@ let userEmail = '';
 function init() {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(
-      ['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId', 'teamId', 'workspacePresets', 'historyLog', 'isLoggedIn', 'accountTier', 'generationsCount', 'userEmail', 'loadedDesignTokens'],
+      ['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId', 'teamId', 'workspacePresets', 'historyLog', 'isLoggedIn', 'accountTier', 'generationsCount', 'userEmail', 'loadedDesignTokens', 'rawTokensText'],
       (result) => {
         if (result.apiKeys) apiKeys = result.apiKeys;
         if (result.activeAgent) activeAgent = result.activeAgent;
@@ -47,6 +48,7 @@ function init() {
         if (result.hasOwnProperty('generationsCount')) generationsCount = result.generationsCount;
         if (result.userEmail) userEmail = result.userEmail;
         if (result.loadedDesignTokens) loadedDesignTokens = result.loadedDesignTokens;
+        if (result.rawTokensText) rawTokensText = result.rawTokensText;
 
         // Initialize UI controllers
         setupTabs();
@@ -79,6 +81,7 @@ function init() {
     userEmail = localStorage.getItem('userEmail') || '';
     userId = localStorage.getItem('userId') || 'pf-web-test-123';
     teamId = localStorage.getItem('teamId') || '';
+    rawTokensText = localStorage.getItem('rawTokensText') || '';
 
     const cachedPresets = localStorage.getItem('workspacePresets');
     if (cachedPresets) {
@@ -1144,90 +1147,85 @@ function sendTelemetry(satisfaction) {
 
 // Category 4: Design Token Constraints Ingestion
 function initDesignTokensUI() {
-  const uploadLink = document.getElementById('token-upload-link');
-  const fileInput = document.getElementById('token-file-input');
+  const textInput = document.getElementById('token-text-input');
   const clearBtn = document.getElementById('token-clear-btn');
 
-  if (uploadLink && fileInput) {
-    uploadLink.addEventListener('click', () => {
-      fileInput.click();
-    });
-
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const text = evt.target.result;
-        let tokens = [];
-        try {
-          if (file.name.endsWith('.json')) {
-            const json = JSON.parse(text);
-            tokens = parseJsonTokens(json);
-          } else if (file.name.endsWith('.css')) {
-            tokens = parseCssTokens(text);
-          } else {
-            alert('Unsupported file format. Please upload a .json or .css design token file.');
-            return;
-          }
-
-          if (tokens.length === 0) {
-            alert('No valid design tokens found in the file.');
-            return;
-          }
-
-          loadedDesignTokens = {
-            filename: file.name,
-            tokens: tokens
-          };
-
-          saveDesignTokensToStorage();
-          renderDesignTokensState();
-        } catch (err) {
-          alert('Error parsing design token file: ' + err.message);
-        }
-      };
-      reader.readAsText(file);
+  if (textInput) {
+    textInput.addEventListener('input', () => {
+      rawTokensText = textInput.value;
+      processRawTokensText();
     });
   }
 
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
+      rawTokensText = '';
+      if (textInput) textInput.value = '';
       loadedDesignTokens = null;
       saveDesignTokensToStorage();
       renderDesignTokensState();
-      if (fileInput) fileInput.value = '';
     });
   }
 
+  if (textInput && rawTokensText) {
+    textInput.value = rawTokensText;
+    processRawTokensText();
+  } else {
+    renderDesignTokensState();
+  }
+}
+
+function processRawTokensText() {
+  let tokens = [];
+  const text = rawTokensText.trim();
+  if (!text) {
+    loadedDesignTokens = null;
+    saveDesignTokensToStorage();
+    renderDesignTokensState();
+    return;
+  }
+
+  try {
+    if (text.startsWith('{')) {
+      const json = JSON.parse(text);
+      tokens = parseJsonTokens(json);
+    } else {
+      tokens = parseCssTokens(text);
+    }
+
+    loadedDesignTokens = {
+      filename: 'Pasted Tokens',
+      tokens: tokens
+    };
+  } catch (e) {
+    loadedDesignTokens = null;
+  }
+
+  saveDesignTokensToStorage();
   renderDesignTokensState();
 }
 
 function saveDesignTokensToStorage() {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ loadedDesignTokens }, () => {
+    chrome.storage.local.set({ loadedDesignTokens, rawTokensText }, () => {
       console.log('Design tokens saved to local storage');
     });
+  } else {
+    localStorage.setItem('rawTokensText', rawTokensText);
+    localStorage.setItem('loadedDesignTokens', JSON.stringify(loadedDesignTokens));
   }
 }
 
 function renderDesignTokensState() {
-  const row = document.getElementById('token-status-row');
-  const emptyMsg = document.getElementById('token-empty-msg');
-  const nameSpan = document.getElementById('token-status-name');
-  const detailsSpan = document.getElementById('token-status-details');
-
-  if (!row || !emptyMsg) return;
+  const statusLbl = document.getElementById('token-status-lbl');
+  if (!statusLbl) return;
 
   if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
-    if (nameSpan) nameSpan.textContent = loadedDesignTokens.filename;
-    if (detailsSpan) detailsSpan.textContent = `${loadedDesignTokens.tokens.length} design tokens loaded`;
-    row.classList.remove('hidden');
-    emptyMsg.classList.add('hidden');
+    statusLbl.textContent = `${loadedDesignTokens.tokens.length} design tokens parsed`;
+    statusLbl.style.color = '#34D399';
   } else {
-    row.classList.add('hidden');
-    emptyMsg.classList.remove('hidden');
+    statusLbl.textContent = 'No design tokens parsed';
+    statusLbl.style.color = '';
   }
 }
 

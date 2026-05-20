@@ -200,17 +200,12 @@
 
     <!-- Category 4: Design Tokens Ingestion -->
     <div class="options-block mt-10">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-        <span class="opt-label" style="margin-bottom: 0;">Design Tokens</span>
-        <button class="preset-save-link" id="token-upload-link" title="Upload tokens.json or custom CSS file">+ Load tokens</button>
+      <span class="opt-label">Design Tokens</span>
+      <textarea id="token-text-input" placeholder="Paste tokens.json or custom CSS variables (e.g. --color: #fff;) here..." style="width: 100%; height: 55px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 6px; color: white; padding: 6px 8px; font-size: 11px; font-family: monospace; resize: vertical; margin-top: 4px; outline: none;"></textarea>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+        <span id="token-status-lbl" style="font-size: 10.5px; color: var(--text-dim); font-style: italic;">No design tokens parsed</span>
+        <button class="token-clear-btn" id="token-clear-btn" title="Clear design tokens" style="font-size: 10px; padding: 2px 6px;">Clear</button>
       </div>
-      <input type="file" id="token-file-input" accept=".json,.css" class="hidden" style="display: none;">
-      <div class="token-status-row hidden" id="token-status-row">
-        <span class="token-status-badge" id="token-status-name">my-tokens.json</span>
-        <span class="token-status-details" id="token-status-details">0 tokens loaded</span>
-        <button class="token-clear-btn" id="token-clear-btn" title="Remove custom design tokens">✕</button>
-      </div>
-      <div id="token-empty-msg" class="empty-presets">No custom design tokens loaded. Prompts will use standard scales.</div>
     </div>
 
     <button class="gen-btn" id="gen-btn">
