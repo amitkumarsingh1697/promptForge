@@ -4,6 +4,7 @@ let currentTab = 'text';
 let imgData = null;
 let imgMime = null;
 let mode = 'direct';
+let proxyUrl = 'http://localhost:8080';
 let lastPrompt = '';
 let activeAgent = 'claude';
 let apiKeys = { claude: '', gemini: '', openai: '', deepseek: '', groq: '', mistral: '' };
@@ -850,7 +851,7 @@ function saveSettings() {
   const apiKey = document.getElementById('api-key-inp').value.trim();
   apiKeys[activeAgent] = apiKey; // Save key for active agent
   
-  const proxyUrl = document.getElementById('proxy-url-inp').value.trim();
+  proxyUrl = document.getElementById('proxy-url-inp').value.trim();
   supabaseUrl = document.getElementById('supabase-url-inp').value.trim();
   supabaseKey = document.getElementById('supabase-key-inp').value.trim();
   userId = document.getElementById('user-id-inp').value.trim();
@@ -1124,7 +1125,7 @@ function sendTelemetry(satisfaction) {
   }
 
   if (mode === 'proxy') {
-    const proxyUrl = document.getElementById('proxy-url-inp').value.trim() || 'http://localhost:8080';
+    proxyUrl = document.getElementById('proxy-url-inp').value.trim() || 'http://localhost:8080';
     fetch(`${proxyUrl}/telemetry`, {
       method: 'POST',
       headers: {
