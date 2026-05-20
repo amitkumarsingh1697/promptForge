@@ -41,28 +41,47 @@ public class GenerateHandler implements HttpHandler {
             LOGGER.info("Processing request for agent: " + targetAgent);
             LOGGER.info("API Key provided in request header: " + (apiKey != null && !apiKey.isEmpty()));
 
-            String result;
-            if ("gemini".equals(targetAgent)) {
-                GeminiClient client = new GeminiClient();
-                result = client.generate(requestBody, apiKey);
-            } else if ("openai".equals(targetAgent)) {
-                OpenAICompatibleClient client = new OpenAICompatibleClient("https://api.openai.com/v1/chat/completions", "OPENAI_API_KEY");
-                result = client.generate(requestBody, apiKey);
-            } else if ("deepseek".equals(targetAgent)) {
-                OpenAICompatibleClient client = new OpenAICompatibleClient("https://api.deepseek.com/chat/completions", "DEEPSEEK_API_KEY");
-                result = client.generate(requestBody, apiKey);
-            } else if ("groq".equals(targetAgent)) {
-                OpenAICompatibleClient client = new OpenAICompatibleClient("https://api.groq.com/openai/v1/chat/completions", "GROQ_API_KEY");
-                result = client.generate(requestBody, apiKey);
-            } else if ("mistral".equals(targetAgent)) {
-                OpenAICompatibleClient client = new OpenAICompatibleClient("https://api.mistral.ai/v1/chat/completions", "MISTRAL_API_KEY");
-                result = client.generate(requestBody, apiKey);
-            } else {
-                ClaudeClient client = new ClaudeClient();
-                result = client.generate(requestBody, apiKey);
+            long startTime = System.currentTimeMillis();
+            boolean success = false;
+            boolean fallbackExecuted = false;
+            String actualAgentUsed = targetAgent;
+            String result = null;
+            String errorMessage = null;
+
+            try {
+                result = callAgent(targetAgent, requestBody, apiKey);
+                success = true;
+            } catch (Exception e) {
+                LOGGER.warning("Primary agent " + targetAgent + " failed: " + e.getMessage() + ". Attempting automated fallback...");
+                errorMessage = e.getMessage();
+                
+                String fallbackAgent = getFallbackAgent(targetAgent);
+                if (fallbackAgent != null) {
+                    try {
+                        LOGGER.info("Executing fallback routing to: " + fallbackAgent);
+                        String fallbackKey = System.getenv(getEnvKeyName(fallbackAgent));
+                        result = callAgent(fallbackAgent, requestBody, fallbackKey);
+                        success = true;
+                        fallbackExecuted = true;
+                        actualAgentUsed = fallbackAgent;
+                    } catch (Exception ex) {
+                        LOGGER.severe("Fallback agent " + fallbackAgent + " failed as well: " + ex.getMessage());
+                        errorMessage = "Primary: " + e.getMessage() + " | Fallback: " + ex.getMessage();
+                    }
+                }
             }
 
-            LOGGER.info("API call successful. Response: " + result);
+            long latencyMs = System.currentTimeMillis() - startTime;
+
+            // Observation Structured Logging
+            LOGGER.info(String.format("[Telemetry Log] {\"primaryAgent\":\"%s\", \"actualAgent\":\"%s\", \"success\":%b, \"latencyMs\":%d, \"fallbackExecuted\":%b, \"error\":\"%s\"}", 
+                targetAgent, actualAgentUsed, success, latencyMs, fallbackExecuted, errorMessage != null ? errorMessage.replace("\"", "\\\"").replace("\n", "\\n") : "none"));
+
+            if (!success) {
+                throw new RuntimeException("All model attempts failed. Error: " + errorMessage);
+            }
+
+            LOGGER.info("API call successful. Response length: " + result.length());
 
             // Send response
             byte[] responseBytes = result.getBytes(StandardCharsets.UTF_8);
@@ -86,6 +105,52 @@ public class GenerateHandler implements HttpHandler {
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(errorBytes);
             }
+        }
+    }
+
+    private String callAgent(String agent, String requestBody, String apiKey) throws Exception {
+        if ("gemini".equals(agent)) {
+            GeminiClient client = new GeminiClient();
+            return client.generate(requestBody, apiKey);
+        } else if ("openai".equals(agent)) {
+            OpenAICompatibleClient client = new OpenAICompatibleClient("https://api.openai.com/v1/chat/completions", "OPENAI_API_KEY");
+            return client.generate(requestBody, apiKey);
+        } else if ("deepseek".equals(agent)) {
+            OpenAICompatibleClient client = new OpenAICompatibleClient("https://api.deepseek.com/chat/completions", "DEEPSEEK_API_KEY");
+            return client.generate(requestBody, apiKey);
+        } else if ("groq".equals(agent)) {
+            OpenAICompatibleClient client = new OpenAICompatibleClient("https://api.groq.com/openai/v1/chat/completions", "GROQ_API_KEY");
+            return client.generate(requestBody, apiKey);
+        } else if ("mistral".equals(agent)) {
+            OpenAICompatibleClient client = new OpenAICompatibleClient("https://api.mistral.ai/v1/chat/completions", "MISTRAL_API_KEY");
+            return client.generate(requestBody, apiKey);
+        } else {
+            ClaudeClient client = new ClaudeClient();
+            return client.generate(requestBody, apiKey);
+        }
+    }
+
+    private String getFallbackAgent(String primaryAgent) {
+        if ("gemini".equals(primaryAgent)) {
+            return "claude";
+        } else {
+            return "gemini";
+        }
+    }
+
+    private String getEnvKeyName(String agent) {
+        if ("gemini".equals(agent)) {
+            return "GEMINI_API_KEY";
+        } else if ("openai".equals(agent)) {
+            return "OPENAI_API_KEY";
+        } else if ("deepseek".equals(agent)) {
+            return "DEEPSEEK_API_KEY";
+        } else if ("groq".equals(agent)) {
+            return "GROQ_API_KEY";
+        } else if ("mistral".equals(agent)) {
+            return "MISTRAL_API_KEY";
+        } else {
+            return "ANTHROPIC_API_KEY";
         }
     }
 }
