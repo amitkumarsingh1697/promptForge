@@ -21,20 +21,93 @@ let generationsCount = 0;
 let userEmail = '';
 
 function init() {
-  setupTabs();
-  setupPills();
-  setupColorPicker();
-  setupImageUpload();
-  setupRte();
-  setupGenerate();
-  setupOutput();
-  setupSettings();
-  setupBottomBar();
-  setupAgentSelect();
-  setupPresets();
-  setupDesignTokens();
-  setupHistory();
-  setupMonetization();
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(
+      ['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId', 'teamId', 'workspacePresets', 'historyLog', 'isLoggedIn', 'accountTier', 'generationsCount', 'userEmail', 'loadedDesignTokens'],
+      (result) => {
+        if (result.apiKeys) apiKeys = result.apiKeys;
+        if (result.activeAgent) activeAgent = result.activeAgent;
+        if (result.mode) mode = result.mode;
+        if (result.proxyUrl) proxyUrl = result.proxyUrl;
+        if (result.supabaseUrl) supabaseUrl = result.supabaseUrl;
+        if (result.supabaseKey) supabaseKey = result.supabaseKey;
+        
+        userId = result.userId || '';
+        if (!userId) {
+          userId = 'pf-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          chrome.storage.local.set({ userId });
+        }
+        
+        if (result.teamId) teamId = result.teamId;
+        if (result.workspacePresets && Array.isArray(result.workspacePresets)) workspacePresets = result.workspacePresets;
+        if (result.historyLog && Array.isArray(result.historyLog)) historyLog = result.historyLog;
+        if (result.hasOwnProperty('isLoggedIn')) isLoggedIn = result.isLoggedIn;
+        if (result.accountTier) accountTier = result.accountTier;
+        if (result.hasOwnProperty('generationsCount')) generationsCount = result.generationsCount;
+        if (result.userEmail) userEmail = result.userEmail;
+        if (result.loadedDesignTokens) loadedDesignTokens = result.loadedDesignTokens;
+
+        // Initialize UI controllers
+        setupTabs();
+        setupPills();
+        setupColorPicker();
+        setupImageUpload();
+        setupRte();
+        setupGenerate();
+        setupOutput();
+        setupBottomBar();
+        setupAgentSelect();
+        
+        // Bind UI triggers and render initial states
+        initSettingsUI();
+        initPresetsUI();
+        initDesignTokensUI();
+        initHistoryUI();
+        initMonetizationUI();
+
+        // Safe cloud synchronization now that state variables are guaranteed
+        syncPresetsFromCloud();
+        syncHistoryFromCloud();
+      }
+    );
+  } else {
+    // Fallback local storage gets for web page testing simulation
+    isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    accountTier = localStorage.getItem('accountTier') || 'free';
+    generationsCount = parseInt(localStorage.getItem('generationsCount') || '0', 10);
+    userEmail = localStorage.getItem('userEmail') || '';
+    userId = localStorage.getItem('userId') || 'pf-web-test-123';
+    teamId = localStorage.getItem('teamId') || '';
+
+    const cachedPresets = localStorage.getItem('workspacePresets');
+    if (cachedPresets) {
+      try { workspacePresets = JSON.parse(cachedPresets); } catch (e) {}
+    }
+    const cachedHistory = localStorage.getItem('historyLog');
+    if (cachedHistory) {
+      try { historyLog = JSON.parse(cachedHistory); } catch (e) {}
+    }
+    const cachedTokens = localStorage.getItem('loadedDesignTokens');
+    if (cachedTokens) {
+      try { loadedDesignTokens = JSON.parse(cachedTokens); } catch (e) {}
+    }
+
+    setupTabs();
+    setupPills();
+    setupColorPicker();
+    setupImageUpload();
+    setupRte();
+    setupGenerate();
+    setupOutput();
+    setupBottomBar();
+    setupAgentSelect();
+
+    initSettingsUI();
+    initPresetsUI();
+    initDesignTokensUI();
+    initHistoryUI();
+    initMonetizationUI();
+  }
 }
 
 function setupTabs() {
@@ -746,7 +819,7 @@ function setupOutput() {
   }
 }
 
-function setupSettings() {
+function initSettingsUI() {
   document.getElementById('mode-direct').addEventListener('click', () => setMode('direct'));
   document.getElementById('mode-proxy').addEventListener('click', () => setMode('proxy'));
   document.getElementById('save-btn').addEventListener('click', saveSettings);
@@ -759,48 +832,18 @@ function setupSettings() {
     devFields.classList.toggle('hidden');
   });
 
-  // Load settings
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId', 'teamId'], (result) => {
-      if (result.apiKeys) apiKeys = result.apiKeys;
-      if (result.activeAgent) {
-        activeAgent = result.activeAgent;
-        document.getElementById('agent-select').value = activeAgent;
-      }
-      if (result.mode) {
-        setMode(result.mode);
-        if (result.mode === 'proxy') {
-          devFields.classList.remove('hidden');
-        }
-      }
-      if (result.proxyUrl) document.getElementById('proxy-url-inp').value = result.proxyUrl;
-      
-      // Load Supabase variables
-      if (result.supabaseUrl) {
-        supabaseUrl = result.supabaseUrl;
-        document.getElementById('supabase-url-inp').value = supabaseUrl;
-      }
-      if (result.supabaseKey) {
-        supabaseKey = result.supabaseKey;
-        document.getElementById('supabase-key-inp').value = supabaseKey;
-      }
-      
-      userId = result.userId || '';
-      if (!userId) {
-        userId = 'pf-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        chrome.storage.local.set({ userId });
-      }
-      document.getElementById('user-id-inp').value = userId;
-
-      if (result.teamId) {
-        teamId = result.teamId;
-        document.getElementById('team-id-inp').value = teamId;
-      }
-
-      // Set initial API key value
-      document.getElementById('api-key-inp').value = apiKeys[activeAgent] || '';
-    });
+  // Populate settings elements from variables
+  document.getElementById('agent-select').value = activeAgent;
+  setMode(mode);
+  if (mode === 'proxy') {
+    devFields.classList.remove('hidden');
   }
+  document.getElementById('proxy-url-inp').value = proxyUrl;
+  document.getElementById('supabase-url-inp').value = supabaseUrl;
+  document.getElementById('supabase-key-inp').value = supabaseKey;
+  document.getElementById('user-id-inp').value = userId;
+  document.getElementById('team-id-inp').value = teamId;
+  document.getElementById('api-key-inp').value = apiKeys[activeAgent] || '';
 }
 
 function saveSettings() {
@@ -884,7 +927,7 @@ function setupAgentSelect() {
 }
 
 // Task 6: Workspace Presets Storage & UI Handlers
-function setupPresets() {
+function initPresetsUI() {
   const linkBtn = document.getElementById('preset-save-link');
   const saveRow = document.getElementById('preset-save-row');
   const nameInp = document.getElementById('preset-name-inp');
@@ -941,16 +984,7 @@ function setupPresets() {
     });
   }
 
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['workspacePresets'], (result) => {
-      if (result.workspacePresets && Array.isArray(result.workspacePresets)) {
-        workspacePresets = result.workspacePresets;
-        renderPresets();
-      }
-      // Sync from cloud on boot
-      syncPresetsFromCloud();
-    });
-  }
+  renderPresets();
 }
 
 function savePresetsToStorage() {
@@ -1108,7 +1142,7 @@ function sendTelemetry(satisfaction) {
 }
 
 // Category 4: Design Token Constraints Ingestion
-function setupDesignTokens() {
+function initDesignTokensUI() {
   const uploadLink = document.getElementById('token-upload-link');
   const fileInput = document.getElementById('token-file-input');
   const clearBtn = document.getElementById('token-clear-btn');
@@ -1166,14 +1200,33 @@ function setupDesignTokens() {
     });
   }
 
-  // Load from local storage
+  renderDesignTokensState();
+}
+
+function saveDesignTokensToStorage() {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['loadedDesignTokens'], (result) => {
-      if (result.loadedDesignTokens) {
-        loadedDesignTokens = result.loadedDesignTokens;
-        renderDesignTokensState();
-      }
+    chrome.storage.local.set({ loadedDesignTokens }, () => {
+      console.log('Design tokens saved to local storage');
     });
+  }
+}
+
+function renderDesignTokensState() {
+  const row = document.getElementById('token-status-row');
+  const emptyMsg = document.getElementById('token-empty-msg');
+  const nameSpan = document.getElementById('token-status-name');
+  const detailsSpan = document.getElementById('token-status-details');
+
+  if (!row || !emptyMsg) return;
+
+  if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
+    if (nameSpan) nameSpan.textContent = loadedDesignTokens.filename;
+    if (detailsSpan) detailsSpan.textContent = `${loadedDesignTokens.tokens.length} design tokens loaded`;
+    row.classList.remove('hidden');
+    emptyMsg.classList.add('hidden');
+  } else {
+    row.classList.add('hidden');
+    emptyMsg.classList.remove('hidden');
   }
 }
 
@@ -1209,35 +1262,8 @@ function parseCssTokens(cssText) {
   return tokens;
 }
 
-function saveDesignTokensToStorage() {
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ loadedDesignTokens }, () => {
-      console.log('Design tokens saved to local storage');
-    });
-  }
-}
-
-function renderDesignTokensState() {
-  const row = document.getElementById('token-status-row');
-  const emptyMsg = document.getElementById('token-empty-msg');
-  const nameSpan = document.getElementById('token-status-name');
-  const detailsSpan = document.getElementById('token-status-details');
-
-  if (!row || !emptyMsg) return;
-
-  if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
-    nameSpan.textContent = loadedDesignTokens.filename;
-    detailsSpan.textContent = `${loadedDesignTokens.tokens.length} design tokens loaded`;
-    row.classList.remove('hidden');
-    emptyMsg.classList.add('hidden');
-  } else {
-    row.classList.add('hidden');
-    emptyMsg.classList.remove('hidden');
-  }
-}
-
 // Category 2: Saved / Prompt History Drawer implementation
-function setupHistory() {
+function initHistoryUI() {
   const toggleBtn = document.getElementById('history-toggle-btn');
   const drawer = document.getElementById('history-drawer');
   const closeBtn = document.getElementById('history-close-btn');
@@ -1267,16 +1293,7 @@ function setupHistory() {
     });
   }
 
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['historyLog'], (result) => {
-      if (result.historyLog && Array.isArray(result.historyLog)) {
-        historyLog = result.historyLog;
-        renderHistory();
-      }
-      // Trigger cloud sync
-      syncHistoryFromCloud();
-    });
-  }
+  renderHistory();
 }
 
 function logPromptToHistory(promptText) {
@@ -1696,7 +1713,7 @@ async function clearAllHistoryFromCloud() {
 }
 
 // Category A: Onboarding & Stripe Paywall Controllers
-function setupMonetization() {
+function initMonetizationUI() {
   const loginGoogle = document.getElementById('btn-login-google');
   const loginGithub = document.getElementById('btn-login-github');
   const logoutBtn = document.getElementById('btn-logout');
@@ -1715,24 +1732,7 @@ function setupMonetization() {
     upgradeBtn.addEventListener('click', handleUpgradeStripe);
   }
 
-  // Load state from chrome storage
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['isLoggedIn', 'accountTier', 'generationsCount', 'userEmail'], (result) => {
-      if (result.hasOwnProperty('isLoggedIn')) isLoggedIn = result.isLoggedIn;
-      if (result.accountTier) accountTier = result.accountTier;
-      if (result.hasOwnProperty('generationsCount')) generationsCount = result.generationsCount;
-      if (result.userEmail) userEmail = result.userEmail;
-      
-      updateQuotaUI();
-    });
-  } else {
-    // Fallback load
-    isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    accountTier = localStorage.getItem('accountTier') || 'free';
-    generationsCount = parseInt(localStorage.getItem('generationsCount') || '0', 10);
-    userEmail = localStorage.getItem('userEmail') || '';
-    updateQuotaUI();
-  }
+  updateQuotaUI();
 }
 
 function saveMonetizationToStorage() {

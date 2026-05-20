@@ -1469,8 +1469,8 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
       if (!row || !emptyMsg) return;
 
       if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
-        nameSpan.textContent = loadedDesignTokens.filename;
-        detailsSpan.textContent = `${loadedDesignTokens.tokens.length} design tokens loaded`;
+        if (nameSpan) nameSpan.textContent = loadedDesignTokens.filename;
+        if (detailsSpan) detailsSpan.textContent = `${loadedDesignTokens.tokens.length} design tokens loaded`;
         row.classList.remove('hidden');
         emptyMsg.classList.add('hidden');
       } else {
