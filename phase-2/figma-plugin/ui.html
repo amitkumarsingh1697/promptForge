@@ -507,6 +507,86 @@
     .preset-pill:hover { background: rgba(124, 106, 250, 0.15); }
     .preset-pill-del { background: transparent; border: none; color: var(--text-muted); font-size: 9px; cursor: pointer; padding: 0 2px; }
     .preset-pill-del:hover { color: #F87171; }
+
+    /* Category 4: Design Tokens Ingestion styles */
+    .token-status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(124, 106, 250, 0.05);
+      border: 1px solid rgba(124, 106, 250, 0.2);
+      border-radius: 8px;
+      padding: 6px 10px;
+      margin-top: 4px;
+    }
+    .token-status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .token-status-details {
+      font-size: 10.5px;
+      color: var(--text-dim);
+      flex: 1;
+    }
+    .token-clear-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 10px;
+      cursor: pointer;
+      padding: 2px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .token-clear-btn:hover {
+      color: #F87171;
+      background: rgba(248, 113, 113, 0.15);
+    }
+
+    /* Telemetry Feedback Loops styling */
+    .feedback-container {
+      display: flex;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .feedback-btn {
+      background: transparent;
+      border: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .feedback-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+    }
+    .feedback-btn.active-up {
+      background: var(--green-dim);
+      color: var(--green);
+      border: 1px solid rgba(52, 211, 153, 0.2);
+    }
+    .feedback-btn.active-down {
+      background: rgba(248, 113, 113, 0.12);
+      color: #F87171;
+      border: 1px solid rgba(248, 113, 113, 0.2);
+    }
   </style>
 </head>
 <body>
@@ -541,6 +621,10 @@
     <div class="field-row">
       <span class="opt-label">Profile Identifier</span>
       <input type="text" id="user-id" placeholder="Generated automatically if empty">
+    </div>
+    <div class="field-row">
+      <span class="opt-label">Team Space ID</span>
+      <input type="text" id="team-id" placeholder="e.g. Design-Team-A">
     </div>
     <button class="gen-btn" id="settings-save-btn" style="padding: 6px; font-size: 11.5px;">Save configurations</button>
   </div>
@@ -581,6 +665,21 @@
     </div>
   </div>
 
+  <!-- Category 4: Design Tokens Ingestion -->
+  <div class="options-block mt-10">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+      <span class="opt-label" style="margin-bottom: 0;">Design Tokens</span>
+      <button class="preset-save-link" id="token-upload-link" title="Upload tokens.json or custom CSS file">+ Load tokens</button>
+    </div>
+    <input type="file" id="token-file-input" accept=".json,.css" class="hidden" style="display: none;">
+    <div class="token-status-row hidden" id="token-status-row">
+      <span class="token-status-badge" id="token-status-name">my-tokens.json</span>
+      <span class="token-status-details" id="token-status-details">0 tokens loaded</span>
+      <button class="token-clear-btn" id="token-clear-btn" title="Remove custom design tokens">✕</button>
+    </div>
+    <div id="token-empty-msg" class="empty-presets" style="font-size: 11px; color: var(--text-dim); font-style: italic;">No custom design tokens loaded. Prompts will use standard scales.</div>
+  </div>
+
   <!-- Workspace configurations pills -->
   <div class="options-block">
     <span class="opt-label">Target Framework</span>
@@ -612,6 +711,18 @@
   <div class="output-wrap" id="output-wrap">
     <div class="out-header">
       <span class="out-label">Generated Figma Specs</span>
+      <div class="feedback-container">
+        <button class="feedback-btn" id="feedback-up" title="Helpful prompt">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+          </svg>
+        </button>
+        <button class="feedback-btn" id="feedback-down" title="Not helpful / incorrect">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm10-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
+          </svg>
+        </button>
+      </div>
     </div>
     <div class="output-box" id="output-box">No specs generated yet.</div>
     <div class="actions">
@@ -774,13 +885,19 @@
       document.getElementById('generate-btn').textContent = 'Generating...';
 
       // Build model instructions
+      let tokenInstructions = '';
+      if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
+        const list = loadedDesignTokens.tokens.map(t => `- ${t.name}: ${t.value}`).join('\n');
+        tokenInstructions = `\nStrictly enforce the following project-specific design system tokens and style variables:\n${list}\n`;
+      }
+
       const systemPrompt = `You are a Figma design token prompt compiler. Recreate this Figma frame structure recursively into precise development prompt layout specs:
 Frame node selection details:
 ${JSON.stringify(payload.geometry, null, 2)}
 
 Target framework: ${payload.framework}
 Target design style direction: ${payload.style}
-
+${tokenInstructions}
 Write a detailed prompt describing sizing, spacing hierarchies, container alignments, text contents, font stacks, and exact hex fills so a developer can code it perfectly.`;
 
       // Dispatch request
@@ -812,6 +929,12 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
 
         lastPrompt = result;
         document.getElementById('output-box').textContent = lastPrompt;
+        
+        const upBtn = document.getElementById('feedback-up');
+        const downBtn = document.getElementById('feedback-down');
+        if (upBtn) upBtn.className = 'feedback-btn';
+        if (downBtn) downBtn.className = 'feedback-btn';
+
         document.getElementById('output-wrap').classList.add('visible');
         logPromptToHistory(lastPrompt);
       } catch (err) {
@@ -856,6 +979,33 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
       showConfirmMessage();
     });
 
+    // Telemetry Satisfaction Feedback Loop
+    const upBtn = document.getElementById('feedback-up');
+    const downBtn = document.getElementById('feedback-down');
+    if (upBtn && downBtn) {
+      upBtn.addEventListener('click', () => {
+        if (upBtn.classList.contains('active-up')) {
+          upBtn.classList.remove('active-up');
+          sendTelemetry('neutral_retracted_up');
+        } else {
+          upBtn.classList.add('active-up');
+          downBtn.classList.remove('active-down');
+          sendTelemetry('up');
+        }
+      });
+
+      downBtn.addEventListener('click', () => {
+        if (downBtn.classList.contains('active-down')) {
+          downBtn.classList.remove('active-down');
+          sendTelemetry('neutral_retracted_down');
+        } else {
+          downBtn.classList.add('active-down');
+          upBtn.classList.remove('active-up');
+          sendTelemetry('down');
+        }
+      });
+    }
+
     function copyToClipboard(text) {
       const el = document.createElement('textarea');
       el.value = text;
@@ -867,8 +1017,10 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
 
     // Figma Plugin Workspace Presets Engine
     let workspacePresets = [];
+    let loadedDesignTokens = null;
 
     setupPresets();
+    setupDesignTokens();
 
     function setupPresets() {
       const linkBtn = document.getElementById('preset-save-link');
@@ -1087,6 +1239,130 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
         });
       } catch (e) {
         console.warn('Supabase delete preset error:', e.message);
+      }
+    }
+
+    // Category 4: Design Token Ingest
+    function setupDesignTokens() {
+      const uploadLink = document.getElementById('token-upload-link');
+      const fileInput = document.getElementById('token-file-input');
+      const clearBtn = document.getElementById('token-clear-btn');
+
+      if (uploadLink && fileInput) {
+        uploadLink.addEventListener('click', () => {
+          fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            const text = evt.target.result;
+            let tokens = [];
+            try {
+              if (file.name.endsWith('.json')) {
+                const json = JSON.parse(text);
+                tokens = parseJsonTokens(json);
+              } else if (file.name.endsWith('.css')) {
+                tokens = parseCssTokens(text);
+              } else {
+                alert('Unsupported file format. Please upload a .json or .css design token file.');
+                return;
+              }
+
+              if (tokens.length === 0) {
+                alert('No valid design tokens found in the file.');
+                return;
+              }
+
+              loadedDesignTokens = {
+                filename: file.name,
+                tokens: tokens
+              };
+
+              saveDesignTokensToStorage();
+              renderDesignTokensState();
+            } catch (err) {
+              alert('Error parsing design token file: ' + err.message);
+            }
+          };
+          reader.readAsText(file);
+        });
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          loadedDesignTokens = null;
+          saveDesignTokensToStorage();
+          renderDesignTokensState();
+          if (fileInput) fileInput.value = '';
+        });
+      }
+
+      // Load cached tokens
+      const cached = localStorage.getItem('figmaLoadedDesignTokens');
+      if (cached) {
+        try {
+          loadedDesignTokens = JSON.parse(cached);
+          renderDesignTokensState();
+        } catch (e) {}
+      }
+    }
+
+    function parseJsonTokens(obj, prefix = '') {
+      let tokens = [];
+      for (let key in obj) {
+        if (!obj.hasOwnProperty(key)) continue;
+        const val = obj[key];
+        const newPrefix = prefix ? `${prefix}.${key}` : key;
+        if (val !== null && typeof val === 'object') {
+          if (val.hasOwnProperty('value') && (typeof val.value === 'string' || typeof val.value === 'number')) {
+            tokens.push({ name: newPrefix, value: val.value });
+          } else {
+            tokens = tokens.concat(parseJsonTokens(val, newPrefix));
+          }
+        } else if (typeof val === 'string' || typeof val === 'number') {
+          tokens.push({ name: newPrefix, value: val });
+        }
+      }
+      return tokens;
+    }
+
+    function parseCssTokens(cssText) {
+      const tokens = [];
+      const regex = /--([a-zA-Z0-9_-]+)\s*:\s*([^;]+)/g;
+      let match;
+      while ((match = regex.exec(cssText)) !== null) {
+        tokens.push({
+          name: `--${match[1].trim()}`,
+          value: match[2].trim()
+        });
+      }
+      return tokens;
+    }
+
+    function saveDesignTokensToStorage() {
+      localStorage.setItem('figmaLoadedDesignTokens', JSON.stringify(loadedDesignTokens));
+    }
+
+    function renderDesignTokensState() {
+      const row = document.getElementById('token-status-row');
+      const emptyMsg = document.getElementById('token-empty-msg');
+      const nameSpan = document.getElementById('token-status-name');
+      const detailsSpan = document.getElementById('token-status-details');
+
+      if (!row || !emptyMsg) return;
+
+      if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
+        nameSpan.textContent = loadedDesignTokens.filename;
+        detailsSpan.textContent = `${loadedDesignTokens.tokens.length} design tokens loaded`;
+        row.classList.remove('hidden');
+        emptyMsg.classList.add('hidden');
+      } else {
+        row.classList.add('hidden');
+        emptyMsg.classList.remove('hidden');
       }
     }
 
@@ -1445,6 +1721,40 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
         });
       } catch (e) {
         console.warn('Supabase clear history error:', e.message);
+      }
+    }
+
+    function sendTelemetry(satisfaction) {
+      if (!lastPrompt) return;
+      const fw = getSelectedValue('fw-group') || 'React';
+      const st = getSelectedValue('st-group') || 'Pixel-perfect';
+      
+      const telemetryData = {
+        promptLength: lastPrompt.length,
+        agent: 'gemini',
+        framework: fw,
+        style: st,
+        satisfaction: satisfaction,
+        platform: 'figma',
+        timestamp: Date.now()
+      };
+
+      console.log('[Figma Telemetry] event:', telemetryData);
+      
+      if (proxyUrl) {
+        fetch(`${proxyUrl}/telemetry`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(telemetryData)
+        })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP status ${res.status}`);
+          return res.json();
+        })
+        .then(data => console.log('[Figma Telemetry] success:', data))
+        .catch(e => console.warn('[Figma Telemetry] offline:', e.message));
       }
     }
   </script>
