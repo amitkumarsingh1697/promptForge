@@ -968,7 +968,7 @@ function initPresetsUI() {
       const shareTeam = document.getElementById('preset-share-team') ? document.getElementById('preset-share-team').checked : false;
       
       const presetObj = {
-        id: Date.now().toString(),
+        id: generateUUID(),
         name: name,
         fw: fw,
         st: st,
@@ -1308,7 +1308,7 @@ function logPromptToHistory(promptText) {
   const font = document.getElementById('fnt-inp').value.trim();
 
   const historyObj = {
-    id: Date.now().toString(),
+    id: generateUUID(),
     prompt: promptText,
     fw: fw,
     st: st,
@@ -1893,6 +1893,14 @@ function handleUpgradeStripe() {
     document.body.appendChild(msg);
     setTimeout(() => msg.remove(), 2500);
   }, 1000);
+}
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
