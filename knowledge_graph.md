@@ -16,9 +16,10 @@ graph TD
         Color[Infinite Color Spectrum Picker]
         Font[Luxury Fonts Dropdown]
         Pills[Framework & Style Dynamic Pills]
-        Tokens[Design Tokens Guidelines Dropzone]
+        Tokens[Pasted JSON/CSS Token Parser]
         History[Saved / History drawer UI]
         Ratings[👍/👎 Satisfaction Ratings]
+        Exports[Specialized Target Exports Dropdown]
     end
 
     subgraph Figma Layer [Figma Companion Plugin]
@@ -26,8 +27,9 @@ graph TD
         FJS[Figma companion controllers]
         FPresets[Figma Presets manager]
         FHistory[Figma History Drawer]
-        FTokens[Figma Design Tokens Dropzone]
+        FTokens[Figma Pasted JSON/CSS Token Parser]
         FCode[Figma code.js sandbox]
+        FExports[Figma Specialized Target Exports Dropdown]
     end
 
     subgraph Extension Security Layer [Manifest V3]
@@ -71,11 +73,13 @@ graph TD
     JS --> Tokens
     JS --> History
     JS --> Ratings
+    JS --> Exports
 
     FUI --> FJS
     FJS --> FPresets
     FJS --> FHistory
     FJS --> FTokens
+    FJS --> FExports
     FCode <-->|postMessage UI Bridge| FUI
     
     MV3 --> CSP
@@ -117,19 +121,21 @@ graph TD
 ## 🚀 In-Depth Lifecycle & Component Walkthrough
 
 ### 1. Front-End Extension Architecture (`extension/` & `phase-2/extension/`)
-- **`popup.html`**: Visual layer optimized with glassmorphic styles. Integrates dynamic pills selection controls, luxury typography fonts selection dropdown, Design Tokens Guidelines file dropzone, Settings drawer, and Prompt History drawer.
+- **`popup.html`**: Visual layer optimized with glassmorphic styles. Integrates dynamic framework/style pills, native color picker, luxury typography fonts selection dropdown, Design Tokens parser panel (JSON/CSS), Settings drawer, Prompt History drawer, and specialized platform copy dropdown.
 - **`popup.js`**: Core state controller:
-  - **SaaS Monetization & Quota Engine**: Enforces a 10-runs limit for Free users. Manages login simulations (Google/GitHub), locks generate CTAs, and launches Stripe upgrades to Pro tier.
-  - **Workspace Presets manager**: Caches styles and configurations loadouts locally and synchronizes them to a hosted cloud database.
-  - **Supabase Cloud Sync**: Invokes Supabase's PostgREST REST endpoints using native `fetch` to create, read, update, or delete presets and history entries.
-  - **Design Token ingestion**: Standard file reader parsing JSON tokens or CSS custom variable formats, injecting guidelines into instructions.
+  - **SaaS Monetization & Quota Engine**: Enforces a 10-runs limit for Free users. Manages logins (email/password, Google/GitHub), locks generate CTAs, and launches Stripe mock upgrades to Pro tier.
+  - **Workspace Presets manager**: Caches styles and configurations loadouts locally and synchronizes them to a hosted cloud database (supporting shared Team Space IDs).
+  - **Supabase Cloud Sync**: Invokes Supabase's PostgREST REST endpoints using native `fetch` to sync presets and history entries.
+  - **Design Token Ingestion**: Standard parser translating pasted JSON or CSS custom variables, displaying parsed token counts.
+  - **Specialized Copy Exports**: A dropdown copy menu formatting prompt outputs for downstream platforms: **v0.dev**, **Cursor / Windsurf** XML tags, and **Claude React Artifacts**.
+  - **AI "Refine Description"**: Uses active LLM clients to correct grammar and expand user UI description details.
 
 ### 2. Figma Plugin Architecture (`figma-plugin/` & `phase-2/figma-plugin/`)
 - **`manifest.json`**: Package config defining Figma network permissions and launch commands.
 - **`code.js`**: Runs in Figma's isolated sandbox. Recursively traverses figma node layer selections to parse node names, layout properties (flexbox paddings, spacing, constraints), solid hex fills, and font configurations, passing them to the UI iframe.
 - **`ui.html`**: High-performance UI view iframe running figma controllers:
   - Connects to the local proxy server `/generate` endpoint to compile specs prompt using parsed frame geometries.
-  - Mirrored workspace presets, design tokens file dropzone, telemetry feedback ratings, history drawer, and Supabase cloud DB synchronization routines.
+  - Mirrored workspace presets, design tokens textarea parser, telemetry feedback ratings, history drawer, specialized copy exports, and Supabase cloud DB synchronization routines.
 
 ### 3. Middleware Proxy Gateway (`backend/` & `phase-2/backend/`)
 - **`GenerateHandler.java`**: Receives prompt compile queries. Measures API latency in milliseconds, captures socket errors or timeouts, and automatically fallbacks execution to alternate clients (e.g. Claude -> Gemini) using fallback environment credentials before logging metrics in a structured JSON statement.
