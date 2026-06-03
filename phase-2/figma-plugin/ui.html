@@ -846,6 +846,7 @@
     let accountTier = 'free';
     let generationsCount = 0;
     let userEmail = '';
+    let accessToken = '';
 
     // Load initial settings on boot
     loadSettings();
@@ -1016,16 +1017,28 @@ Write a detailed prompt describing sizing, spacing hierarchies, container alignm
           const resJson = await response.json();
           result = resJson.candidates[0].content.parts[0].text;
         } else {
-          // Fallback proxy gateway request
+          // Fallback proxy gateway request using safe normalized contract
+          let tokenStr = '';
+          if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
+            tokenStr = loadedDesignTokens.tokens.map(t => `- ${t.name}: ${t.value}`).join('\n');
+          }
+          const headers = { 'Content-Type': 'application/json', 'X-Target-Agent': 'gemini' };
+          if (isLoggedIn && accessToken) {
+            headers['Authorization'] = 'Bearer ' + accessToken;
+          }
           const response = await fetch(`${proxyUrl}/generate`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Target-Agent': 'gemini' },
+            headers: headers,
             body: JSON.stringify({
-              contents: [{ parts: [{ text: systemPrompt }] }]
+              source: "figma",
+              framework: fw,
+              style: st,
+              tokensText: tokenStr,
+              geometry: activeNodeData
             })
           });
           const resJson = await response.json();
-          result = resJson.candidates ? resJson.candidates[0].content.parts[0].text : resJson.error || JSON.stringify(resJson);
+          result = resJson.prompt || resJson.error || JSON.stringify(resJson);
         }
 
         lastPrompt = result;

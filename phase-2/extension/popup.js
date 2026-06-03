@@ -21,11 +21,13 @@ let isLoggedIn = false;
 let accountTier = 'free';
 let generationsCount = 0;
 let userEmail = '';
+let accessToken = '';
+let refreshToken = '';
 
 function init() {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(
-      ['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId', 'teamId', 'workspacePresets', 'historyLog', 'isLoggedIn', 'accountTier', 'generationsCount', 'userEmail', 'loadedDesignTokens', 'rawTokensText'],
+      ['apiKeys', 'activeAgent', 'mode', 'proxyUrl', 'supabaseUrl', 'supabaseKey', 'userId', 'teamId', 'workspacePresets', 'historyLog', 'isLoggedIn', 'accountTier', 'generationsCount', 'userEmail', 'loadedDesignTokens', 'rawTokensText', 'accessToken', 'refreshToken'],
       (result) => {
         if (result.apiKeys) apiKeys = result.apiKeys;
         if (result.activeAgent) activeAgent = result.activeAgent;
@@ -33,6 +35,8 @@ function init() {
         if (result.proxyUrl) proxyUrl = result.proxyUrl;
         if (result.supabaseUrl) supabaseUrl = result.supabaseUrl;
         if (result.supabaseKey) supabaseKey = result.supabaseKey;
+        if (result.accessToken) accessToken = result.accessToken;
+        if (result.refreshToken) refreshToken = result.refreshToken;
         
         userId = result.userId || '';
         if (!userId) {
@@ -555,6 +559,9 @@ async function generate() {
       endpoint = document.getElementById('proxy-url-inp').value.trim() + '/generate';
       headers['X-Target-Agent'] = activeAgent;
       headers['X-API-Key'] = apiKey;
+      if (isLoggedIn && accessToken) {
+        headers['Authorization'] = 'Bearer ' + accessToken;
+      }
     } else {
       if (activeAgent === 'claude') {
         endpoint = 'https://api.anthropic.com/v1/messages';
@@ -580,7 +587,36 @@ async function generate() {
     console.log('Calling endpoint:', endpoint);
     console.log('Headers:', headers);
 
-    const res = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) });
+    let finalBody;
+    if (mode === 'proxy') {
+      let tokenStr = '';
+      if (loadedDesignTokens && loadedDesignTokens.tokens && loadedDesignTokens.tokens.length > 0) {
+        tokenStr = loadedDesignTokens.tokens.map(t => `- ${t.name}: ${t.value}`).join('\n');
+      }
+      let varStr = '';
+      if (activeTabVariables && activeTabVariables.variables) {
+        const keys = Object.keys(activeTabVariables.variables);
+        if (keys.length > 0) {
+          varStr = keys.map(k => `- ${k}: ${activeTabVariables.variables[k]}`).join('\n');
+        }
+      }
+      finalBody = JSON.stringify({
+        source: "extension",
+        framework: fw,
+        style: st,
+        colors: colors,
+        font: font,
+        description: desc,
+        url: urlVal,
+        tokensText: tokenStr,
+        variablesText: varStr,
+        screenshot: currentTab === 'image' ? imgData : (currentTab === 'url' ? screenshotDataUrl : '')
+      });
+    } else {
+      finalBody = JSON.stringify(payload);
+    }
+
+    const res = await fetch(endpoint, { method: 'POST', headers, body: finalBody });
     if (!res.ok) {
       const errorBody = await res.text();
       console.error('API Error Body:', errorBody);
@@ -603,6 +639,16 @@ async function generate() {
     }
 
     const data = await res.json();
+    if (mode === 'proxy') {
+      renderOutput(data);
+      if (isLoggedIn) {
+        generationsCount++;
+        saveMonetizationToStorage();
+        updateQuotaUI();
+      }
+      return;
+    }
+
     let raw = '';
     if (activeAgent === 'claude') {
       raw = (data.content || []).map(b => b.text || '').join('');
@@ -1538,9 +1584,10 @@ function formatRelativeTime(epoch) {
 
 // Supabase REST client synchronization helpers
 function getSupabaseHeaders() {
+  const token = (isLoggedIn && accessToken) ? accessToken : supabaseKey;
   return {
     'apikey': supabaseKey,
-    'Authorization': `Bearer ${supabaseKey}`,
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
     'Prefer': 'return=representation'
   };
@@ -1717,6 +1764,9 @@ function initMonetizationUI() {
   const loginGithub = document.getElementById('btn-login-github');
   const logoutBtn = document.getElementById('btn-logout');
   const upgradeBtn = document.getElementById('btn-upgrade-stripe');
+  
+  const emailLoginBtn = document.getElementById('btn-email-login');
+  const emailSignupBtn = document.getElementById('btn-email-signup');
 
   if (loginGoogle) {
     loginGoogle.addEventListener('click', () => handleOAuthLogin('google'));
@@ -1730,18 +1780,27 @@ function initMonetizationUI() {
   if (upgradeBtn) {
     upgradeBtn.addEventListener('click', handleUpgradeStripe);
   }
+  
+  if (emailLoginBtn) {
+    emailLoginBtn.addEventListener('click', handleEmailLogin);
+  }
+  if (emailSignupBtn) {
+    emailSignupBtn.addEventListener('click', handleEmailSignup);
+  }
 
   updateQuotaUI();
 }
 
 function saveMonetizationToStorage() {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ isLoggedIn, accountTier, generationsCount, userEmail });
+    chrome.storage.local.set({ isLoggedIn, accountTier, generationsCount, userEmail, accessToken, refreshToken });
   } else {
     localStorage.setItem('isLoggedIn', isLoggedIn);
     localStorage.setItem('accountTier', accountTier);
     localStorage.setItem('generationsCount', generationsCount);
     localStorage.setItem('userEmail', userEmail);
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
   }
 }
 
@@ -1829,31 +1888,201 @@ function updateQuotaUI() {
   }
 }
 
-function handleOAuthLogin(provider) {
-  console.log(`Simulating ${provider} OAuth authentication...`);
-  isLoggedIn = true;
-  accountTier = 'free';
-  generationsCount = 2; // Pre-populate some mock runs
-  userEmail = provider === 'google' ? 'amit.singh@google.com' : 'amitkmrsingh1697@github';
-  
-  saveMonetizationToStorage();
-  updateQuotaUI();
-  
+function showToast(text, isSuccess = true) {
   const msg = document.createElement('div');
   msg.style.position = 'absolute';
   msg.style.top = '10px';
   msg.style.left = '50%';
   msg.style.transform = 'translateX(-50%)';
-  msg.style.background = 'var(--green)';
+  msg.style.background = isSuccess ? '#34D399' : '#EF4444';
   msg.style.color = '#000';
-  msg.style.padding = '4px 12px';
+  msg.style.padding = '5px 14px';
   msg.style.borderRadius = '20px';
   msg.style.fontSize = '11px';
-  msg.style.fontWeight = '600';
+  msg.style.fontWeight = '700';
   msg.style.zIndex = '10000';
-  msg.textContent = `Signed in via ${provider}!`;
+  msg.textContent = text;
   document.body.appendChild(msg);
-  setTimeout(() => msg.remove(), 1500);
+  setTimeout(() => msg.remove(), 2500);
+}
+
+async function handleEmailLogin() {
+  const emailInp = document.getElementById('auth-email-inp');
+  const passInp = document.getElementById('auth-password-inp');
+  const email = emailInp ? emailInp.value.trim() : '';
+  const password = passInp ? passInp.value.trim() : '';
+
+  if (!email || !password) {
+    showError('Please enter both email and password.');
+    return;
+  }
+
+  try {
+    const loginBtn = document.getElementById('btn-email-login');
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing In...';
+
+    const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error_description || errData.msg || errData.message || 'Login failed.');
+    }
+
+    const data = await response.json();
+    
+    accessToken = data.access_token;
+    refreshToken = data.refresh_token;
+    isLoggedIn = true;
+    userEmail = data.user.email;
+    userId = data.user.id;
+    
+    accountTier = data.user.user_metadata && data.user.user_metadata.account_tier ? data.user.user_metadata.account_tier : 'free';
+    
+    saveMonetizationToStorage();
+    updateQuotaUI();
+    
+    if (emailInp) emailInp.value = '';
+    if (passInp) passInp.value = '';
+
+    syncPresetsFromCloud();
+    syncHistoryFromCloud();
+
+    showToast(`Welcome back, ${userEmail}!`, true);
+  } catch (err) {
+    showError('Authentication failed: ' + err.message);
+  } finally {
+    const loginBtn = document.getElementById('btn-email-login');
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Sign In';
+    }
+  }
+}
+
+async function handleEmailSignup() {
+  const emailInp = document.getElementById('auth-email-inp');
+  const passInp = document.getElementById('auth-password-inp');
+  const email = emailInp ? emailInp.value.trim() : '';
+  const password = passInp ? passInp.value.trim() : '';
+
+  if (!email || !password) {
+    showError('Please enter both email and password.');
+    return;
+  }
+  
+  if (password.length < 6) {
+    showError('Password must be at least 6 characters.');
+    return;
+  }
+
+  try {
+    const signupBtn = document.getElementById('btn-email-signup');
+    signupBtn.disabled = true;
+    signupBtn.textContent = 'Signing Up...';
+
+    const response = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.msg || errData.message || 'Signup failed.');
+    }
+
+    const data = await response.json();
+    
+    if (data.identities && data.identities.length === 0) {
+      showError('This email is already registered.');
+      return;
+    }
+
+    showToast('Sign up successful! Check your email to confirm registration.', true);
+    
+    if (passInp) passInp.value = '';
+  } catch (err) {
+    showError('Signup failed: ' + err.message);
+  } finally {
+    const signupBtn = document.getElementById('btn-email-signup');
+    if (signupBtn) {
+      signupBtn.disabled = false;
+      signupBtn.textContent = 'Sign Up';
+    }
+  }
+}
+
+async function handleOAuthLogin(provider) {
+  if (typeof chrome === 'undefined' || !chrome.identity || !chrome.identity.launchWebAuthFlow) {
+    showError('OAuth web auth flow is only available inside Chrome Extension environment.');
+    return;
+  }
+
+  try {
+    const redirectUrl = chrome.identity.getRedirectURL();
+    const authUrl = `${supabaseUrl}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}`;
+
+    console.log(`Launching web auth flow for ${provider} pointing to: ${authUrl}`);
+
+    chrome.identity.launchWebAuthFlow({
+      url: authUrl,
+      interactive: true
+    }, function (responseUrl) {
+      if (chrome.runtime.lastError) {
+        showError('OAuth failed: ' + chrome.runtime.lastError.message);
+        return;
+      }
+
+      if (!responseUrl) {
+        showError('OAuth failed. Received empty response URL.');
+        return;
+      }
+
+      try {
+        const parsedUrl = new URL(responseUrl.replace('#', '?'));
+        const token = parsedUrl.searchParams.get('access_token');
+        const rToken = parsedUrl.searchParams.get('refresh_token');
+
+        if (!token) {
+          showError('Authentication failed: Access token missing.');
+          return;
+        }
+
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        
+        accessToken = token;
+        refreshToken = rToken || '';
+        isLoggedIn = true;
+        userEmail = payload.email || `${provider}-user@promptforge.dev`;
+        userId = payload.sub || '';
+        
+        accountTier = payload.user_metadata && payload.user_metadata.account_tier ? payload.user_metadata.account_tier : 'free';
+
+        saveMonetizationToStorage();
+        updateQuotaUI();
+
+        syncPresetsFromCloud();
+        syncHistoryFromCloud();
+
+        showToast(`Logged in via ${provider}!`, true);
+      } catch (err) {
+        showError('Failed parsing auth token: ' + err.message);
+      }
+    });
+  } catch (e) {
+    showError('Failed initiating OAuth: ' + e.message);
+  }
 }
 
 function handleLogout() {
@@ -1861,8 +2090,11 @@ function handleLogout() {
   accountTier = 'free';
   generationsCount = 0;
   userEmail = '';
+  accessToken = '';
+  refreshToken = '';
   saveMonetizationToStorage();
   updateQuotaUI();
+  showToast('Logged out successfully.', true);
 }
 
 function handleUpgradeStripe() {

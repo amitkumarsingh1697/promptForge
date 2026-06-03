@@ -316,7 +316,19 @@
         
         <!-- Logged out state -->
         <div id="account-logged-out" class="account-card" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-top: 4px; display: block; width: 100%;">
-          <span style="font-size: 10.5px; color: var(--text-dim); margin-bottom: 8px; display: block; font-style: italic;">Sign in to sync presets and track usage quota.</span>
+          <span style="font-size: 10.5px; color: var(--text-dim); margin-bottom: 6px; display: block; font-style: italic;">Sign in to sync presets and track usage quota.</span>
+          
+          <!-- Email / Password Authentication -->
+          <div id="email-auth-fields" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px;">
+            <input class="settings-input" type="email" id="auth-email-inp" placeholder="Email Address" style="padding: 5px 8px; font-size: 11px; width: 100%; box-sizing: border-box;">
+            <input class="settings-input" type="password" id="auth-password-inp" placeholder="Password" style="padding: 5px 8px; font-size: 11px; width: 100%; box-sizing: border-box;">
+            <div style="display: flex; gap: 6px;">
+              <button class="save-btn" id="btn-email-login" style="flex: 1; padding: 4px; font-size: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border);">Sign In</button>
+              <button class="save-btn" id="btn-email-signup" style="flex: 1; padding: 4px; font-size: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border);">Sign Up</button>
+            </div>
+          </div>
+          <div style="text-align: center; margin: 6px 0; font-size: 9.5px; color: var(--text-dim);">— OR —</div>
+          
           <div style="display: flex; gap: 6px;">
             <button class="mode-toggle" id="btn-login-google" style="flex: 1; padding: 4px; font-size: 10px;">Google Login</button>
             <button class="mode-toggle" id="btn-login-github" style="flex: 1; padding: 4px; font-size: 10px;">GitHub Login</button>
