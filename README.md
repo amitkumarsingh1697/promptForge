@@ -11,16 +11,18 @@ PromptForge is packaged as a high-performance **Chrome Extension** and a native 
 ### 1. Advanced Context Ingestion & Figma Bridge
 *   **Deep DOM Style Harvester**: Injected Chrome content scripts capture computed CSS variables (`--*`), page typography stacks, and container borders instantly.
 *   **Figma Geometry Analyzer**: Standalone Figma plugin companion scans layers recursively, extracting coordinates, flex layout attributes, solid hex fills, and padding specs.
-*   **Brand Token Dropzone**: Allows users to drop `tokens.json` or Tailwind CSS files to dynamically inject guideline enforcements inside instructions.
+*   **Pasted JSON/CSS Token Parser**: Allows users to paste design system `tokens.json` files or raw CSS custom properties to recursively parse and inject styling guidelines into instructions.
+*   **AI "Refine Description" Tool**: An editor toolbar utility using active LLM clients to correct grammar and expand user layout descriptions with technical specifications.
 
 ### 2. Workspace Presets & Collaborative Spaces
 *   **Persistent Preset Quota**: Caches frameworks, custom colors, and editorial typography configurations into 3 slots.
 *   **Supabase Cloud Syncing**: Synchronizes workspace loadouts and prompts history instantly via client-side REST calls.
 *   **Shared Team Workspaces**: Save presets with a `team_id` Space ID. Team templates display with a 👥 icon and are shared collaboratively.
 
-### 3. Iterative History Drawers
+### 3. Iterative History Drawers & Copy Exports
 *   **Specs Log drawers**: Slide-over panel logging prompt versions.
 *   **Favorites & Bookmarking**: Star history items to pin them to the top of the feed. One-click "Restore" automatically resets options pills and input values.
+*   **Specialized Copy Exports**: A dropdown copy menu formatting prompts directly for downstream platforms: **v0.dev**, **Cursor / Windsurf** XML tags, and **Claude React Artifacts**.
 
 ### 4. Monetization & Onboarding Gates
 *   **Google & GitHub Auth**: Sign-in widgets inside settings drawers to sync identities and profile logs.
@@ -28,6 +30,7 @@ PromptForge is packaged as a high-performance **Chrome Extension** and a native 
 *   **BYOK Bypasses**: Logged-in users skip local API key requirements; calls fallback to proxy-managed platform keys.
 
 ### 5. Resilient Telemetry & Fallbacks Routing
+*   **JWT Secure Proxy Gate**: Proxy server validates client authorization using Supabase JWT tokens via HMAC-SHA256 signature verification.
 *   **Structured Latency metrics**: Proxy GenerateHandler computes execution durations in milliseconds and logs details as structured JSON.
 *   **Automated fallbacks**: If a primary LLM request times out or fails (e.g., ClaudeSonnet rate-limited), the proxy automatically redirects execution routes to backup models (e.g. GeminiFlash) before returning client responses.
 *   **Satisfaction Rating Loop**: Embeds upvote/downvote qualitative buttons on generated specs.
