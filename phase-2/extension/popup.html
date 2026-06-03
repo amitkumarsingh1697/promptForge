@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptForge</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+<div class="ext-shell">
+
+  <div class="header">
+    <div class="logo-mark">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M10 2L17 6V14L10 18L3 14V6L10 2Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M7 10L9.5 12.5L13.5 8" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="header-text">
+      <div class="header-title">PromptForge</div>
+      <div class="header-sub">UI prompt generator</div>
+    </div>
+    <button class="settings-toggle-icon" id="history-toggle-btn" title="View prompt history" style="margin-right: 6px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    </button>
+    <button class="settings-toggle-icon" id="settings-toggle-btn" title="Settings">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="8" cy="8" r="2.5"/>
+        <path d="M8 2v1M8 13v1M2 8H1m13 0h1M3.8 3.8l.7.7M11.5 11.5l.7.7M3.8 12.2l.7-.7M11.5 4.5l.7-.7"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-text">
+      <svg class="tab-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="12" height="10" rx="2"/>
+        <line x1="5" y1="6" x2="11" y2="6"/>
+        <line x1="5" y1="8.5" x2="9" y2="8.5"/>
+      </svg>
+      Describe it
+    </button>
+    <button class="tab-btn" id="tab-image">
+      <svg class="tab-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="12" height="10" rx="2"/>
+        <circle cx="5.5" cy="7" r="1.2"/>
+        <path d="M2 11l3-3 2.5 2.5 2.5-2.5 3.5 3.5"/>
+      </svg>
+      Upload image
+    </button>
+    <button class="tab-btn" id="tab-url">
+      <svg class="tab-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M6.5 9.5l3-3"/>
+        <path d="M6 6.5l-1.5 1.5a2.12 2.12 0 000 3l.5.5a2.12 2.12 0 003 0l1.5-1.5"/>
+        <path d="M10 9.5l1.5-1.5a2.12 2.12 0 000-3l-.5-.5a2.12 2.12 0 00-3 0L6.5 6"/>
+      </svg>
+      URL / Link
+    </button>
+  </div>
+
+  <div class="content">
+
+    <div id="pane-text" class="pane">
+      <div class="input-wrap">
+        <div class="rte-container">
+          <div class="rte-toolbar">
+            <button class="rte-btn" data-command="bold" title="Bold (Ctrl+B)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+            </button>
+            <button class="rte-btn" data-command="italic" title="Italic (Ctrl+I)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+            </button>
+            <button class="rte-btn" data-command="underline" title="Underline (Ctrl+U)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+            </button>
+            <span class="rte-divider"></span>
+            <button class="rte-btn" data-command="insertUnorderedList" title="Bullet List">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </button>
+            <button class="rte-btn" data-command="insertOrderedList" title="Numbered List">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6H2v1h2v1H2"/><path d="M2 10h2v2H2v-1h1"/></svg>
+            </button>
+            <button class="refine-btn" id="refine-txt-btn" title="Refine description grammar and clarity with AI">
+              ✨ Refine
+            </button>
+          </div>
+          <div id="desc-txt" class="rte-editor" contenteditable="true" placeholder="Describe your UI in plain English… e.g. A SaaS dashboard with a collapsible dark sidebar, top nav with user avatar, 4 KPI cards showing revenue metrics, an area chart for monthly growth, and a paginated data table with filter chips."></div>
+        </div>
+        <span class="char-badge" id="char-count">0/1500</span>
+      </div>
+    </div>
+
+    <div id="pane-image" class="pane hidden">
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-icon-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+            <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor"/>
+            <circle cx="8" cy="10" r="1.5" stroke="currentColor"/>
+            <path d="M3 16l4.5-4.5 3 3 3.5-3.5 5 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="drop-title">Drop screenshot or mockup</div>
+        <div class="drop-sub">PNG, JPG, WEBP · max 4 MB</div>
+      </div>
+      <input type="file" id="file-inp" accept="image/*">
+      <div class="img-preview-area" id="img-prev-area">
+        <img id="img-prev" src="" alt="Uploaded UI">
+        <button class="img-remove" id="img-remove-btn">✕</button>
+      </div>
+    </div>
+
+    <div id="pane-url" class="pane hidden">
+      <input class="extra-input url-full-input" id="url-inp" type="url"
+        placeholder="https://dribbble.com/shots/... or any public UI URL">
+      <div class="url-info-box">
+        Paste a public design URL (Dribbble, Behance, a live site). The extension will screenshot and analyze it automatically.
+      </div>
+    </div>
+
+    <div class="options-block">
+      <span class="opt-label">Target framework</span>
+      <div class="pill-group" id="fw-group">
+        <button class="pill on">React</button>
+        <button class="pill">Next.js</button>
+        <button class="pill">Tailwind CSS</button>
+        <button class="pill">Vue</button>
+        <button class="pill">Angular</button>
+        <button class="pill">Svelte</button>
+        <button class="pill">HTML + CSS</button>
+        <button class="pill">Flutter / Mobile</button>
+        <button class="pill">Figma spec</button>
+        <button class="pill">Any</button>
+      </div>
+    </div>
+
+    <div class="options-block mt-10">
+      <span class="opt-label">Style direction</span>
+      <div class="pill-group" id="st-group">
+        <button class="pill on">Pixel-perfect</button>
+        <button class="pill">Minimal clean</button>
+        <button class="pill">SaaS Bento Grid</button>
+        <button class="pill">Neo-Brutalism</button>
+        <button class="pill">Skeuomorphic</button>
+        <button class="pill">Material Design</button>
+        <button class="pill">Dark mode</button>
+        <button class="pill">Glassmorphism</button>
+        <button class="pill">Neumorphism</button>
+      </div>
+    </div>
+
+    <div class="extra-inputs mt-10">
+      <div class="settings-field flex-1">
+        <span class="opt-label">Color Palette</span>
+        <div class="color-picker-wrap">
+          <input class="extra-input w-full" id="clr-inp" type="text" placeholder="e.g. #7C6AFA, #A78BFA" value="">
+          <label class="color-picker-label" title="Infinite Color Picker">
+            <input type="color" id="native-color-picker" value="#7C6AFA">
+          </label>
+        </div>
+      </div>
+      <div class="settings-field flex-1">
+        <span class="opt-label">Custom Font</span>
+        <select class="extra-input w-full" id="fnt-inp" title="Select premium typography">
+          <option value="">Default UI (Outfit)</option>
+          <option value="Inter">Inter (Global UI Standard)</option>
+          <option value="Playfair Display">Playfair Display (Luxury Serif)</option>
+          <option value="Cinzel">Cinzel (High-Fashion Serif)</option>
+          <option value="Cormorant Garamond">Cormorant (Sophisticated Serif)</option>
+          <option value="Montserrat">Montserrat (Elegant Premium Sans)</option>
+          <option value="Syne">Syne (Artistic Avant-Garde)</option>
+          <option value="Plus Jakarta Sans">Plus Jakarta (Modern Tech)</option>
+          <option value="SF Pro">SF Pro / System Standard</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Task 6: Workspace Presets Engine -->
+    <div class="options-block mt-10">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <span class="opt-label" style="margin-bottom: 0;">Workspace Presets</span>
+        <button class="preset-save-link" id="preset-save-link" title="Save active config combo">+ Save loadout</button>
+      </div>
+      <div class="preset-save-row hidden" id="preset-save-row" style="flex-wrap: wrap; gap: 6px;">
+        <input class="extra-input" id="preset-name-inp" type="text" placeholder="e.g. SaaS Dashboard" maxlength="20" style="flex: 1; min-width: 120px; padding: 5px 8px; font-size: 11px;">
+        <button class="preset-btn-action confirm" id="preset-save-confirm">Save</button>
+        <button class="preset-btn-action cancel" id="preset-save-cancel">✕</button>
+        <div style="width: 100%; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+          <input type="checkbox" id="preset-share-team" style="cursor: pointer; width: auto; margin: 0;">
+          <label for="preset-share-team" style="font-size: 10.5px; color: var(--text-muted); cursor: pointer; user-select: none;">Share with Team Space</label>
+        </div>
+      </div>
+      <div class="pill-group" id="presets-container">
+        <span class="empty-presets" id="empty-presets-msg">No presets saved. Configure above to save loadouts.</span>
+      </div>
+    </div>
+
+    <!-- Category 4: Design Tokens Ingestion -->
+    <div class="options-block mt-10">
+      <span class="opt-label">Design Tokens</span>
+      <textarea id="token-text-input" placeholder="Paste tokens.json or custom CSS variables (e.g. --color: #fff;) here..." style="width: 100%; height: 55px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 6px; color: white; padding: 6px 8px; font-size: 11px; font-family: monospace; resize: vertical; margin-top: 4px; outline: none;"></textarea>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+        <span id="token-status-lbl" style="font-size: 10.5px; color: var(--text-dim); font-style: italic;">No design tokens parsed</span>
+        <button class="token-clear-btn" id="token-clear-btn" title="Clear design tokens" style="font-size: 10px; padding: 2px 6px;">Clear</button>
+      </div>
+    </div>
+
+    <button class="gen-btn" id="gen-btn">
+      <div class="spinner" id="spinner"></div>
+      <svg id="btn-icon" width="15" height="15" viewBox="0 0 18 18" fill="none">
+        <path d="M9 2l1.8 5.4H16l-4.5 3.3 1.7 5.3L9 13l-4.2 3 1.7-5.3L2 7.4h5.2L9 2z"
+          stroke="white" stroke-width="1.3" stroke-linejoin="round"/>
+      </svg>
+      <span id="btn-txt">Generate optimized prompt</span>
+    </button>
+
+    <div class="err-banner" id="err-banner"></div>
+
+    <div class="output-wrap" id="output-wrap">
+      <div class="divider"></div>
+      <div class="out-header">
+        <span class="out-label">Generated prompt</span>
+        <div class="feedback-container">
+          <button class="feedback-btn" id="feedback-up" title="Helpful prompt">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+            </svg>
+          </button>
+          <button class="feedback-btn" id="feedback-down" title="Not helpful / incorrect">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm10-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
+            </svg>
+          </button>
+        </div>
+        <span class="acc-pill" id="acc-pill">99% accuracy</span>
+      </div>
+      <div class="output-box" id="output-box"></div>
+      <div class="breakdown">
+        <div class="bdcard">
+          <div class="bdcard-lbl">Layout</div>
+          <div class="bdcard-val" id="bd-layout">—</div>
+        </div>
+        <div class="bdcard">
+          <div class="bdcard-lbl">Components</div>
+          <div class="bdcard-val" id="bd-comp">—</div>
+        </div>
+        <div class="bdcard">
+          <div class="bdcard-lbl">Prompt size</div>
+          <div class="bdcard-val" id="bd-tok">—</div>
+        </div>
+      </div>
+      <div class="actions">
+        <!-- Task 5: Split Copy Button with Specialized Exports -->
+        <div class="split-btn-group">
+          <button class="act-btn split-main" id="copy-btn" title="Copy raw prompt string">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="4" width="8" height="8" rx="1.5"/>
+              <path d="M2 10V2h8"/>
+            </svg>
+            Copy
+          </button>
+          <button class="act-btn split-arrow" id="copy-dropdown-btn" title="Specialized target export options">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M3 4.5l3 3 3-3"/>
+            </svg>
+          </button>
+          <div class="copy-dropdown-menu hidden" id="copy-dropdown-menu">
+            <button class="copy-opt-btn" data-export="v0">🚀 Format for v0.dev</button>
+            <button class="copy-opt-btn" data-export="cursor">💻 Copy for Cursor / Windsurf</button>
+            <button class="copy-opt-btn" data-export="artifacts">🎨 Send to Claude Artifacts</button>
+          </div>
+        </div>
+        <button class="act-btn" id="regen-btn">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M2 7a5 5 0 009.5-2M12 7a5 5 0 01-9.5 2"/>
+            <path d="M10.5 4.5L12 2.5l1.5 2"/>
+          </svg>
+          Regenerate
+        </button>
+        <button class="act-btn" id="refine-btn">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M2 12l4-4 6-6"/>
+            <path d="M8 2h4v4"/>
+          </svg>
+          Refine ↗
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-row">
+      <div class="settings-field">
+        <span class="settings-lbl">Active Agent</span>
+        <select class="settings-input" id="agent-select">
+          <option value="claude">Claude (Anthropic)</option>
+          <option value="gemini">Gemini (Google)</option>
+          <option value="openai">OpenAI (ChatGPT)</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="groq">Groq (Llama 3)</option>
+          <option value="mistral">Mistral AI</option>
+        </select>
+      </div>
+      <div class="settings-field">
+        <span class="settings-lbl">API Key</span>
+        <input class="settings-input" type="password" id="api-key-inp" placeholder="Enter API key for selected agent">
+      </div>
+      
+      <!-- Account Profile & Subscription (Category A) -->
+      <div class="settings-field mt-10" style="border-top: 1px solid var(--border); padding-top: 10px;">
+        <span class="settings-lbl">Identity & Subscription</span>
+        
+        <!-- Logged out state -->
+        <div id="account-logged-out" class="account-card" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-top: 4px; display: block; width: 100%;">
+          <span style="font-size: 10.5px; color: var(--text-dim); margin-bottom: 6px; display: block; font-style: italic;">Sign in to sync presets and track usage quota.</span>
+          
+          <!-- Email / Password Authentication -->
+          <div id="email-auth-fields" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px;">
+            <input class="settings-input" type="email" id="auth-email-inp" placeholder="Email Address" style="padding: 5px 8px; font-size: 11px; width: 100%; box-sizing: border-box;">
+            <input class="settings-input" type="password" id="auth-password-inp" placeholder="Password" style="padding: 5px 8px; font-size: 11px; width: 100%; box-sizing: border-box;">
+            <div style="display: flex; gap: 6px;">
+              <button class="save-btn" id="btn-email-login" style="flex: 1; padding: 4px; font-size: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border);">Sign In</button>
+              <button class="save-btn" id="btn-email-signup" style="flex: 1; padding: 4px; font-size: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border);">Sign Up</button>
+            </div>
+          </div>
+          <div style="text-align: center; margin: 6px 0; font-size: 9.5px; color: var(--text-dim);">— OR —</div>
+          
+          <div style="display: flex; gap: 6px;">
+            <button class="mode-toggle" id="btn-login-google" style="flex: 1; padding: 4px; font-size: 10px;">Google Login</button>
+            <button class="mode-toggle" id="btn-login-github" style="flex: 1; padding: 4px; font-size: 10px;">GitHub Login</button>
+          </div>
+        </div>
+
+        <!-- Logged in state -->
+        <div id="account-logged-in" class="account-card hidden" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-top: 4px; width: 100%;">
+          <div class="user-info-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <img class="user-avatar" id="user-avatar" src="" style="width: 20px; height: 20px; border-radius: 50%; display: none;">
+            <div style="flex: 1;">
+              <div class="user-email" id="user-email" style="font-size: 11px; font-weight: 600; color: white;">user@promptforge.dev</div>
+              <div class="user-tier-badge" id="user-tier" style="font-size: 9.5px; color: var(--accent); font-weight: 700; text-transform: uppercase; margin-top: 1px;">Free Tier</div>
+            </div>
+            <button class="token-clear-btn" id="btn-logout" title="Sign out" style="font-size: 10px; padding: 2px 6px;">Sign Out</button>
+          </div>
+
+          <!-- Usage limit bar -->
+          <div class="quota-container" id="quota-container" style="margin-bottom: 4px; margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">
+              <span>Generations limit</span>
+              <span id="quota-label">0 / 10 runs</span>
+            </div>
+            <div class="quota-bar-bg" style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+              <div class="quota-bar-fill" id="quota-fill" style="width: 0%; height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s;"></div>
+            </div>
+          </div>
+
+          <!-- Checkout upgrade paywall -->
+          <button class="save-btn" id="btn-upgrade-stripe" style="width: 100%; margin-top: 8px; padding: 5px; background: linear-gradient(135deg, #7c6afa 0%, #a78bfa 100%); border: none; font-size: 10.5px;">⚡ Upgrade to Pro</button>
+        </div>
+      </div>
+      
+      <div id="dev-fields" class="hidden">
+        <div class="settings-field">
+          <span class="settings-lbl">Mode</span>
+          <div class="mode-btns">
+            <button class="mode-toggle direct" id="mode-direct">● Direct API</button>
+            <button class="mode-toggle" id="mode-proxy">◌ Java proxy</button>
+          </div>
+        </div>
+        <div class="settings-field" id="proxy-field">
+          <span class="settings-lbl">Proxy URL</span>
+          <input class="settings-input" id="proxy-url-inp" type="text" value="http://localhost:8080">
+        </div>
+      </div>
+      
+      <div class="dev-mode-wrap">
+        <button class="dev-mode-btn" id="dev-mode-toggle">⚙️ Developer options</button>
+      </div>
+      
+      <!-- Supabase cloud sync configurations -->
+      <div class="settings-field mt-10" style="border-top: 1px solid var(--border); padding-top: 10px;">
+        <span class="settings-lbl">Supabase Project URL</span>
+        <input class="settings-input" id="supabase-url-inp" type="text" value="https://ywlvbitacvemgkndmfef.supabase.co">
+      </div>
+      <div class="settings-field">
+        <span class="settings-lbl">Supabase Anon Key</span>
+        <input class="settings-input" id="supabase-key-inp" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bHZiaXRhY3ZlbWdrbmRtZmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTM0NjcsImV4cCI6MjA5NDc2OTQ2N30.diLEK6xnzQj1hBH6G2NFq0uTuC8xJHlHX6hkwYfwAqQ">
+      </div>
+      <div class="settings-field">
+        <span class="settings-lbl">Profile Identifier</span>
+        <input class="settings-input" id="user-id-inp" type="text" placeholder="Generated automatically if empty">
+      </div>
+      <div class="settings-field">
+        <span class="settings-lbl">Team Space ID</span>
+        <input class="settings-input" id="team-id-inp" type="text" placeholder="e.g. Design-Team-A">
+      </div>
+      
+      <button class="save-btn" id="save-btn">Save settings</button>
+      <button class="act-btn mt-6" id="clear-cache-btn">Clear Saved Keys</button>
+    </div>
+  <!-- Category 2: Saved / Prompt History Drawer -->
+  <div class="history-drawer" id="history-drawer">
+    <div class="history-header">
+      <span class="history-title">Prompt History</span>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="history-clear-all" id="history-clear-all" title="Clear all history entries">Clear all</button>
+        <button class="history-close-btn" id="history-close-btn">✕</button>
+      </div>
+    </div>
+    <div class="history-list" id="history-list">
+      <div class="empty-history" id="history-empty-msg">No prompt history found. Try generating above!</div>
+    </div>
+  </div>
+
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

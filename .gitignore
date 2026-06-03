@@ -1,2 +1,5 @@
 backend/out/
+phase-2/backend/out/
 .DS_Store
+promptForgeSsh*
+*.class
